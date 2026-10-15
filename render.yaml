@@ -1,0 +1,43 @@
+# Render Blueprint — 서버(FastAPI) + Key Value(Valkey 8)
+# 문법: https://render.com/docs/blueprint-spec (2026-10-14 확인)
+# Render 대시보드 → New → Blueprint 에서 이 저장소를 고르면 아래 두 서비스를 만든다.
+# sync: false 값은 Blueprint를 처음 만들 때만 입력 창이 뜬다. 나중에 바꿀 때는 서비스의 Environment 화면에서 고친다.
+services:
+  # 임시 상태(초안·캐시·실시간 로그 Pub/Sub). 무료 등급은 메모리 전용이라 재시작하면 내용이 지워진다.
+  - type: keyvalue
+    name: house-tour-notes-kv
+    plan: free
+    region: singapore          # 서버와 같은 리전이어야 내부 주소로 붙는다
+    ipAllowList: []            # 외부 접속 막음(같은 워크스페이스·리전의 내부 연결만)
+    maxmemoryPolicy: allkeys-lru   # 메모리가 차면 오래 안 쓴 키부터 지운다(초안이 지워지면 화면이 "초안 만료"로 안내)
+
+  # API 서버
+  - type: web
+    name: house-tour-notes-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health   # 프로세스만 확인(항상 200). DB·Redis 확인은 /ready
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION    # 정확한 패치 버전까지 적어야 한다
+        value: 3.12.13
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: house-tour-notes-kv
+          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # AI Studio의 무료 등급 분당 요청 수(RPM)에 맞춰 정한다. docs/DEPLOY.md 3절
+      - key: GEMINI_MIN_INTERVAL_SEC
+        value: "4"

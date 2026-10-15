@@ -1,0 +1,15 @@
+# Streamlit 설정. 진입점이 frontend/app.py여도 Streamlit은 저장소 루트의 .streamlit/을 읽는다
+# (Community Cloud도 같음). 옵션: https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+
+[browser]
+# 사용 통계를 Streamlit에 보내지 않는다
+gatherUsageStats = false
+
+[client]
+# 처리되지 않은 예외는 종류만 보여 준다(스택·메시지에 입력 내용이 섞여 화면에 노출되는 것을 막음).
+# 로컬에서 자세히 보려면: STREAMLIT_CLIENT_SHOW_ERROR_DETAILS=full streamlit run frontend/app.py
+showErrorDetails = "type"
+
+[server]
+# 업로드 위젯 한도(MB). 서버 MAX_PHOTO_MB 기본값 10과 맞춘다
+maxUploadSize = 10

@@ -1,0 +1,95 @@
+{
+  "_note": "정답 세트 아님. 형식 확인용 예시 3건이다. 팀이 쓸 실제 기준 세트는 eval/eval_cases.json(20건, 정답은 팀 2명이 각자 쓴 뒤 합의)이다. 실제 주소·연락처는 넣지 않는다.",
+  "_format": "case_key, memo_text, expected_json(AnalysisResult 모양: 네 목록 confirmed_checks·unchecked·ambiguous_checks·missing_checks가 9개 체크리스트를 겹침 없이 나눔), tags, criteria(이 사례에서 무엇을 보면 되는지 한두 줄). expected_json.checks는 비워도 된다(자동 채점 대상 아님).",
+  "cases": [
+    {
+      "case_key": "example_money_idiom",
+      "memo_text": "역 근처 원룸. 천에 오십, 관리비 5만(인터넷 포함). 2층 남향. 채광 괜찮음. 역까지 걸어서 5분.",
+      "expected_json": {
+        "label": "역 근처 원룸",
+        "deposit_manwon": 1000,
+        "monthly_rent_manwon": 50,
+        "maintenance_fee_manwon": 5,
+        "maintenance_includes": ["인터넷"],
+        "transit": "역까지 걸어서 5분",
+        "floor": "2층",
+        "direction": "남향",
+        "pros": ["채광 괜찮음", "역까지 걸어서 5분"],
+        "cons": [],
+        "checks": [
+          {"item": "채광", "status": "confirmed", "evidence": "채광 괜찮음"},
+          {"item": "층수", "status": "confirmed", "evidence": "2층"},
+          {"item": "교통", "status": "confirmed", "evidence": "역까지 걸어서 5분"}
+        ],
+        "ambiguous": [],
+        "mixed_listings": false,
+        "confirmed_checks": ["채광", "층수", "교통"],
+        "unchecked": [],
+        "ambiguous_checks": [],
+        "missing_checks": ["소음", "수압", "곰팡이", "난방", "옵션", "보안"]
+      },
+      "tags": ["money_idiom"],
+      "criteria": "'천에 오십'을 보증금 1000·월세 50(만원)으로 읽는지 본다."
+    },
+    {
+      "case_key": "example_negation_unchecked",
+      "memo_text": "골목 안 투룸. 보증금 300 월세 40 관리비 8. 곰팡이 없음, 소음 없음. 수압은 확인 못함. 난방도 못 봤음. 반지하.",
+      "expected_json": {
+        "label": "골목 안 투룸",
+        "deposit_manwon": 300,
+        "monthly_rent_manwon": 40,
+        "maintenance_fee_manwon": 8,
+        "maintenance_includes": [],
+        "transit": null,
+        "floor": "반지하",
+        "direction": null,
+        "pros": ["곰팡이 없음", "소음 없음"],
+        "cons": [],
+        "checks": [
+          {"item": "곰팡이", "status": "confirmed", "evidence": "곰팡이 없음"},
+          {"item": "소음", "status": "confirmed", "evidence": "소음 없음"},
+          {"item": "수압", "status": "unchecked", "evidence": "수압은 확인 못함"},
+          {"item": "난방", "status": "unchecked", "evidence": "난방도 못 봤음"},
+          {"item": "층수", "status": "confirmed", "evidence": "반지하"}
+        ],
+        "ambiguous": [],
+        "mixed_listings": false,
+        "confirmed_checks": ["소음", "곰팡이", "층수"],
+        "unchecked": ["수압", "난방"],
+        "ambiguous_checks": [],
+        "missing_checks": ["채광", "옵션", "보안", "교통"]
+      },
+      "tags": ["negation", "explicit_unchecked"],
+      "criteria": "'곰팡이 없음·소음 없음'을 단점에 넣지 않고 confirmed로 두는지, '확인 못함·못 봤음'을 unchecked로 두는지 본다."
+    },
+    {
+      "case_key": "example_no_maintenance_fee",
+      "memo_text": "신축 오피스텔. 보증금 500 월세 55. 8층 동향. 풀옵션(세탁기, 에어컨). 공동현관 비밀번호 있음.",
+      "expected_json": {
+        "label": "신축 오피스텔",
+        "deposit_manwon": 500,
+        "monthly_rent_manwon": 55,
+        "maintenance_fee_manwon": null,
+        "maintenance_includes": [],
+        "transit": null,
+        "floor": "8층",
+        "direction": "동향",
+        "pros": ["신축", "풀옵션", "공동현관 비밀번호 있음"],
+        "cons": [],
+        "checks": [
+          {"item": "층수", "status": "confirmed", "evidence": "8층"},
+          {"item": "옵션", "status": "confirmed", "evidence": "풀옵션(세탁기, 에어컨)"},
+          {"item": "보안", "status": "confirmed", "evidence": "공동현관 비밀번호 있음"}
+        ],
+        "ambiguous": [],
+        "mixed_listings": false,
+        "confirmed_checks": ["층수", "옵션", "보안"],
+        "unchecked": [],
+        "ambiguous_checks": [],
+        "missing_checks": ["채광", "소음", "수압", "곰팡이", "난방", "교통"]
+      },
+      "tags": ["no_maintenance_fee"],
+      "criteria": "관리비 언급이 없으면 0이 아니라 null(미기재)로 두는지 본다."
+    }
+  ]
+}

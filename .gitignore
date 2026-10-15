@@ -1,0 +1,8 @@
+.env
+.streamlit/secrets.toml
+.venv/
+__pycache__/
+merge_report.txt
+*_output.zip
+I*_patch.zip
+.pytest_cache/

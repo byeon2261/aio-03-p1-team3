@@ -1,0 +1,14 @@
+# 로컬 개발용 Redis 호환 저장소(Valkey 8) 하나. 저장소 루트에서 `docker compose up -d`.
+# 배포 환경(Render Key Value)도 Valkey 8이라 동작을 맞춘다.
+# 이미지·태그: https://valkey.io/download/ (2026-10-14 확인, 8.x 최신 8.1.10)
+services:
+  valkey:
+    image: valkey/valkey:8.1.10-alpine
+    ports:
+      - "127.0.0.1:6379:6379"   # 내 컴퓨터에서만 접속(같은 네트워크의 다른 기기에는 열지 않음)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

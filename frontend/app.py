@@ -1,0 +1,86 @@
+"""Streamlit 진입점. 저장소 루트에서 `streamlit run frontend/app.py`.
+
+- 로그인 전: 로그인 페이지만.
+- 로그인 후: features/*/pages.py의 PAGES + R 상세 페이지 2개(세션 상세 20, 매물 상세 30)를 order 순으로.
+  admin_only 페이지는 운영자에게만 보인다.
+"""
+
+from __future__ import annotations
+
+import time
+
+import streamlit as st
+
+st.set_page_config(page_title="집 보기 메모 비교", page_icon="🏠", layout="wide")
+
+from core import nav, slots, state  # noqa: E402
+from core.api import ApiError, api_post, ping_health  # noqa: E402
+from core.host_pages import render_listing_detail, render_session_detail  # noqa: E402
+from core.loader import load_pages, load_sections  # noqa: E402
+from core.ui import privacy_notice  # noqa: E402
+from features.auth.pages import render_login  # noqa: E402
+
+HOST_PAGES = [
+    {"key": "session_detail", "title": "세션 상세", "order": 20, "admin_only": False,
+     "render": render_session_detail, "feature": "core"},
+    {"key": "listing_detail", "title": "매물 상세", "order": 30, "admin_only": False,
+     "render": render_listing_detail, "feature": "core"},
+]
+WAKE_LIMIT_SEC = 60
+
+
+def wake_server() -> None:
+    """Render 무료 서버는 잠들어 있을 수 있다. /health가 늦으면 안내하고 최대 1분 기다린다."""
+    if st.session_state.get("_server_awake"):
+        return
+    if ping_health(timeout_sec=3):
+        st.session_state["_server_awake"] = True
+        return
+    deadline = time.time() + WAKE_LIMIT_SEC
+    with st.spinner("서버를 깨우는 중입니다(최대 1분)"):
+        while time.time() < deadline:
+            if ping_health(timeout_sec=10):
+                st.session_state["_server_awake"] = True
+                return
+            time.sleep(2)
+    st.error("서버에 연결할 수 없습니다. 잠시 후 '다시 시도'를 누르세요.")
+    if st.button("다시 시도", type="primary"):
+        st.rerun()
+    st.stop()
+
+
+def sidebar() -> None:
+    with st.sidebar:
+        profile = state.current_profile() or {}
+        st.caption(f"{profile.get('nickname', '사용자')} 님" + (" · 운영자" if state.is_admin() else ""))
+        if st.button("로그아웃", key="logout", width="stretch"):
+            try:
+                api_post("/auth/logout")
+            except ApiError:
+                pass  # 서버 응답과 상관없이 화면 토큰은 지운다
+            state.clear_auth()
+            st.rerun()
+
+
+def main() -> None:
+    wake_server()
+    privacy_notice()
+
+    if not state.is_logged_in():
+        st.navigation([st.Page(render_login, title="로그인", url_path="login", default=True)],
+                      position="hidden").run()
+        return
+
+    slots.register_sections(load_sections())
+    items = [p for p in load_pages() + HOST_PAGES if state.is_admin() or not p["admin_only"]]
+    items.sort(key=lambda p: (p["order"], p["key"]))
+    pages = {
+        p["key"]: st.Page(p["render"], title=p["title"], url_path=p["key"], default=(i == 0))
+        for i, p in enumerate(items)
+    }
+    nav.register_pages(pages)
+    sidebar()
+    st.navigation(list(pages.values())).run()
+
+
+main()

@@ -1,0 +1,2 @@
+# P2 분석(F4·F5) 추가 의존성 — Gemini SDK (Interactions API)
+google-genai==2.30.1

@@ -1,0 +1,2 @@
+# P8 — 배포 설정 테스트(render.yaml·compose.yaml 읽기)
+PyYAML==6.0.3
