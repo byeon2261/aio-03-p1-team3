@@ -99,7 +99,8 @@ def test_comparison_api_fake_provider_and_row_filter(client_as, make_user, memor
     register_row_filter("within_budget", keep)
 
     full = c.get(f"/sessions/{s['id']}/comparison").json()
-    assert full["providers"] == [{"key": "budget", "title": "예산"}]
+    # 다른 기능(F12 score 등)의 열도 함께 붙으므로 자기 key만 확인한다(CONTRACT 7절)
+    assert {"key": "budget", "title": "예산"} in full["providers"]
     assert full["hidden_count"] == {}
     cols = {r["listing_no"]: r["columns"]["budget"] for r in full["rows"]}
     assert cols[1]["tone"] == "good" and cols[2]["tone"] == "bad" and cols[3]["display"] == "판단 불가"

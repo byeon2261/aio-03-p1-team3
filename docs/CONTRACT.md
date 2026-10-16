@@ -2,6 +2,7 @@
 
 > I1(통합 확인)에서 고침: 합친 결과에 맞춘 등록 규칙(1·7절), 형식 실패 표기, 기능 폴더 상속 모델(3절), 실제 응답 모델·기본값(4절), 추가 오류 코드·eval 저장 방식(5절), api.py 401 처리(6절).
 > I2(계약 변경)에서 고침: feedback `action` 열(0008)로 '수정 취소(revert)'와 '메모에 없음(set + null)' 구분(2·3·5절, repo·FeedbackIn/Out·P3 본문·P6 필드 수정 비율 최종 상태 기준), 삭제 전 이벤트 payload에 `storage` 추가(2절 events).
+> F12(#14)에서 더함: 항목 가중치화 — 3절 상속 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 슬롯·열 key.
 
 R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/conftest.py`·`fakes.py`, `frontend/app.py`, `frontend/core/*`, `supabase/migrations/*`)은 고치지 않는다. 바꿀 것이 있으면 REPORT "계약 변경 요청"에 적고 계약 안에서 우회한다.
 
@@ -60,6 +61,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - P3 `features/feedback/schemas.py`: `FeedbackCreateIn`(FeedbackIn + `corrections: [{field_name, action, corrected_value}]`. 한 필드 모양 `{field_name, action, corrected_value}`도 받아 corrections 하나로 본다. `action`은 `"set"`(기본)·`"revert"`. set은 corrected_value 키 필수이고 null = 메모에 없음(금액 3개·transit·floor·direction만, 목록은 `[]`). revert = 수정 취소(AI 값으로 되돌림), corrected_value는 생략 또는 null. field_name 없이 action만 보내면 422), `FeedbackSaveOut`(FeedbackOut 대표 행 + `items: list[FeedbackOut]` 이번에 저장한 모든 행)
 - P6 `features/admin_logs/feedback_cases.py`: `FeedbackCaseOut`(FeedbackAdminOut + `memo_head`, `analysis_summary`)
 - P7 `features/evals/schemas.py`: `EvalRunSummaryOut`(EvalRunOut + failure_counts, result_count, error_case_count), `EvalResultDetailOut`(EvalResultOut + case_id, memo_text, criteria, expected_json, mixed_listings_match, compare_output_json, compare_mixed_listings_match), `EvalCompareOut`(EvalResultsOut + condition_mismatches, run·compare_run은 EvalRunSummaryOut, results는 EvalResultDetailOut)
+- F12 `features/scoring/schemas.py`(계약 모델을 상속하지 않는 새 모델): `WeightProfileIn{name(1~30, 앞뒤 공백 제거), weights: [WeightItemIn{item_key, weight(0~100)}]}`(빠진 항목은 0), `WeightProfileOut{id, name, weights: [WeightItemOut] (SCORE_ITEMS 전체·순서), created_at, updated_at}`, `SatisfactionIn{items: [SatisfactionItemIn{item_key, satisfaction(0~100)}]}`(빠진 항목 = 미입력, 통째로 바꿈), `SatisfactionOut{listing_id, items: [SatisfactionItemOut{item_key, satisfaction|null}], entered_count, updated_at}`, `ScoringSettingIn{enabled, weight_profile_id|null}`, `ScoringSettingOut{session_id, enabled(기본 true), weight_profile_id, weight_profile_name, updated_at, items}`, `ScoresOut{session_id, setting: ScoringSettingOut, items, rows: [ScoreRow{listing_id, listing_no, label, score|null, rank|null, entered_count, total_items}], hidden_count}`. item_key는 `features/scoring/items.py`의 `SCORE_ITEMS`(기본 = CHECKLIST) 중 하나, 아니거나 중복이면 422
 
 ## 4. 엔드포인트
 | 담당 | 메서드 경로 | 요청 → 응답 |
@@ -86,11 +88,16 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | P6 | GET /admin/metrics · /admin/feedback | MetricsOut(기본 최근 24시간, 사유별 개수는 `extra.feedback_reason_counts`) · list[FeedbackCaseOut](`rating` 기본 down, `limit` 기본 20·최대 100, 분석별 최신 평가만) |
 | P7 | GET·POST /admin/eval-runs | list[EvalRunSummaryOut] · EvalRunCreateIn → EvalRunSummaryOut('running', 실행은 백그라운드) |
 | P7 | GET /admin/eval-runs/{run_id}/results?compare_to= | EvalCompareOut |
+| F12 | GET·POST /weight-profiles | list[WeightProfileOut](만든 순서) · WeightProfileIn → WeightProfileOut |
+| F12 | GET·PUT·DELETE /weight-profiles/{profile_id} | WeightProfileOut · WeightProfileIn → WeightProfileOut(통째로 바꿈) · OkOut(고른 세션은 프로필 없음으로) |
+| F12 | GET·PUT /listings/{listing_id}/satisfaction | SatisfactionOut · SatisfactionIn → SatisfactionOut |
+| F12 | GET·PUT /sessions/{session_id}/scoring | ScoringSettingOut(설정 없으면 켜짐·프로필 없음) · ScoringSettingIn → ScoringSettingOut |
+| F12 | GET /sessions/{session_id}/scores?filters=a,b | ScoresOut(필터 통과 매물끼리 순위, 꺼져 있으면 rows 빈 목록) |
 /admin/*는 `require_admin`.
 
 ## 5. 오류 코드·테이블
 오류: AUTH_REQUIRED·INVALID_CREDENTIALS 401, EMAIL_NOT_CONFIRMED·FORBIDDEN 403, SESSION/LISTING/ANALYSIS/PHOTO/DRAFT_NOT_FOUND 404, DRAFT_EXPIRED 410, VALIDATION_ERROR 422(detail.fields: loc·type·msg만), AI_RATE_LIMITED 429, INTERNAL_ERROR 500, AI_FORMAT_ERROR 502, CONFIG_MISSING·KV_UNAVAILABLE·CLEANUP_FAILED 503, AI_TIMEOUT 504.
-기능이 추가한 오류(I1 반영): AI_UPSTREAM_ERROR 502(그 밖의 Gemini 오류, P2), STORAGE_UNAVAILABLE 503(사진 업로드 실패, P4), EVAL_CASES_EMPTY·EVAL_RUN_IN_PROGRESS 409, EVAL_RUN_NOT_FOUND 404(P7). 화면 문구는 `frontend/core/ui.py`의 `ERROR_MESSAGES`.
+기능이 추가한 오류(I1 반영): AI_UPSTREAM_ERROR 502(그 밖의 Gemini 오류, P2), STORAGE_UNAVAILABLE 503(사진 업로드 실패, P4), EVAL_CASES_EMPTY·EVAL_RUN_IN_PROGRESS 409, EVAL_RUN_NOT_FOUND 404(P7). WEIGHT_PROFILE_NOT_FOUND 404(없거나 남의 가중치 프로필, F12). 화면 문구는 `frontend/core/ui.py`의 `ERROR_MESSAGES`.
 
 | 테이블 | 쓰기 담당 | 메모 |
 |---|---|---|
@@ -103,16 +110,17 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | session_budgets | P5 | PK session_id (0007) |
 | request_logs | R 미들웨어 | admin db 전용 |
 | eval_cases·eval_runs·eval_results | P7 | admin db 전용. 채점 기준 글은 `eval_cases.expected_json`의 `_criteria` 키(전용 열 없음, 채점·응답 expected에서는 빼고 `criteria`로 따로 준다). `eval_results.status`는 `success` 또는 파이프라인 오류 코드, `failure_codes`는 NUM·HAL·MIS·CHK·FMT. AI 원문(raw_output)은 저장하지 않는다 |
-CASCADE는 소유 사슬(→photos·session_budgets·eval_results 포함), request_logs.profile_id만 SET NULL. 읽기는 누구나.
+| weight_profiles·weight_items·listing_satisfactions·session_scoring | F12 | (0120) 항목 행은 대상별로 지우고 다시 넣어 통째로 바꾼다. session_scoring PK session_id, weight_profile_id는 프로필 삭제 시 SET NULL. item_key에 목록 CHECK 없음(SCORE_ITEMS가 정함) |
+CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블 포함), request_logs.profile_id만 SET NULL. 읽기는 누구나.
 
 ## 6. 화면 (frontend/core)
 - `api.py`: `api_get/post/put/patch/delete(path, *, json=None, params=None, files=None)`, `api_stream(path, params=None)`(SSE, {"event","data","id"}), `ApiError(status, code, message, detail)`. 토큰 자동, 만료 임박·401이면 1회 갱신 후 재시도, 대기 90초. 갱신한 토큰으로도 401 `INVALID_CREDENTIALS`면(예: `/me/password` 현재 비밀번호 틀림) 로그인을 유지하고 오류만 낸다. 그 밖의 401은 로그인 상태를 지운다. 연결 실패 status 0 NETWORK_ERROR/TIMEOUT.
 - `state.py`: `current_profile()`, `is_admin()`, `is_logged_in()`, `set_profile(p)`, `budget_filter_key(sid)`. 키 `auth`, `selected_session_id`, `selected_listing_id`, `budget_filter_on:{session_id}`(P5 씀, P3 읽음).
 - `nav.py`: `go_sessions()`, `go_session_detail(sid)`, `go_listing_detail(lid)`, `go_page(key)`. on_click 콜백이 아닌 본문(`if st.button(...)`)에서 부른다.
 - `slots.py`: `render_slot(slot, ctx)`. `ui.py`: `fmt_manwon(v)`("미기재"/"500만원"), `fmt_kst(t)`, `show_api_error(e)`(코드별 문구+다음 할 일), `privacy_notice()`.
-- 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10, P5 예산 20, P3 비교표 30. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40.
+- 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10, P5 예산 20, F12 항목 가중치 25, P3 비교표 30, F12 적합도 순위 35. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40, F12 항목 만족도 45.
 - 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, P4 마이페이지 80 `mypage`, P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
-- 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용).
+- 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용), 비교표 열 key `score`(F12, order 20). F12 순위 섹션은 `budget_filter_key(sid)`를 읽어 같은 필터로 `/scores`를 부른다.
 
 ## 7. 테스트
 픽스처: `memory_db`, `memory_kv`, `memory_storage`, `memory_broker`, `fake_auth`, `make_user(role="user")`, `client_as(user | None)`. 등록부·이벤트·파이프라인은 테스트마다 자동 초기화.
