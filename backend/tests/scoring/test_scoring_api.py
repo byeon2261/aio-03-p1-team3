@@ -257,3 +257,9 @@ def test_scoring_stale_item_rows_are_ignored(client_as, make_user, memory_db):
     assert sat["entered_count"] == 0 and "옛 항목" not in [i["item_key"] for i in sat["items"]]
     rows = {r["label"]: r["score"] for r in c.get(f"/sessions/{s['id']}/scores").json()["rows"]}
     assert rows == {"1번 집": None, "2번 집": 80}
+
+
+def test_scoring_score_items_endpoint(client_as, make_user):
+    r = client_as(make_user()).get("/score-items")
+    assert r.status_code == 200 and r.json() == {"items": list(SCORE_ITEMS)}
+    assert client_as(None).get("/score-items").status_code == 401

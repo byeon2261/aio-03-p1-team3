@@ -88,6 +88,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | P6 | GET /admin/metrics · /admin/feedback | MetricsOut(기본 최근 24시간, 사유별 개수는 `extra.feedback_reason_counts`) · list[FeedbackCaseOut](`rating` 기본 down, `limit` 기본 20·최대 100, 분석별 최신 평가만) |
 | P7 | GET·POST /admin/eval-runs | list[EvalRunSummaryOut] · EvalRunCreateIn → EvalRunSummaryOut('running', 실행은 백그라운드) |
 | P7 | GET /admin/eval-runs/{run_id}/results?compare_to= | EvalCompareOut |
+| F12 | GET /score-items | {items: list[str]}(SCORE_ITEMS 순서, 프로필이 없어도 입력칸을 그릴 때 씀) |
 | F12 | GET·POST /weight-profiles | list[WeightProfileOut](만든 순서) · WeightProfileIn → WeightProfileOut |
 | F12 | GET·PUT·DELETE /weight-profiles/{profile_id} | WeightProfileOut · WeightProfileIn → WeightProfileOut(통째로 바꿈) · OkOut(고른 세션은 프로필 없음으로) |
 | F12 | GET·PUT /listings/{listing_id}/satisfaction | SatisfactionOut · SatisfactionIn → SatisfactionOut |
@@ -119,7 +120,7 @@ CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블
 - `nav.py`: `go_sessions()`, `go_session_detail(sid)`, `go_listing_detail(lid)`, `go_page(key)`. on_click 콜백이 아닌 본문(`if st.button(...)`)에서 부른다.
 - `slots.py`: `render_slot(slot, ctx)`. `ui.py`: `fmt_manwon(v)`("미기재"/"500만원"), `fmt_kst(t)`, `show_api_error(e)`(코드별 문구+다음 할 일), `privacy_notice()`.
 - 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10, P5 예산 20, F12 항목 가중치 25, P3 비교표 30, F12 적합도 순위 35. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40, F12 항목 만족도 45.
-- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, P4 마이페이지 80 `mypage`, P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
+- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필, 마지막 탭은 F12 `features.scoring.sections.render_profile_manager()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
 - 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용), 비교표 열 key `score`(F12, order 20). F12 순위 섹션은 `budget_filter_key(sid)`를 읽어 같은 필터로 `/scores`를 부른다.
 
 ## 7. 테스트
