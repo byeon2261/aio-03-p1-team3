@@ -152,10 +152,11 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
    4. `supabase/migrations/0006_photos.sql`
    5. `supabase/migrations/0007_budget.sql`
    6. `supabase/migrations/0008_feedback_action.sql`
+   7. `supabase/migrations/0120_scoring.sql` (F12 항목 가중치화)
 
-   0004·0005는 비워 둔 번호, 0120~·0130~·0140~은 이후 기능(F12~F14)용 예약 번호다.
+   0004·0005는 비워 둔 번호다. 0120~은 F12가 쓰고, 0130~·0140~은 이후 기능(F13·F14)용 예약 번호다.
 
-   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다.
+   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다. 마찬가지로 `0120_scoring.sql`을 실행하기 전에 새 서버가 뜨면 비교표의 적합도 열이 “불러오지 못함”으로 나오고 항목 가중치 화면이 오류를 낸다.
 3. **버킷 확인**: Storage 화면에 비공개 버킷 `listing-photos`가 있는지 본다. 없거나 실행 결과에 `bucket insert skipped` 알림이 있으면 **Storage → New bucket**에서 이름 `listing-photos`, Public bucket 끔으로 만들고 `0006_photos.sql`을 한 번 더 실행한다.
 4. **API 키 확인**: **Settings → API Keys**에서 publishable key(`sb_publishable_…`)와 secret key(`sb_secret_…`)를 복사한다. 레거시 `anon`·`service_role` 키는 쓰지 않는다. secret key는 서버(Render) 환경변수에만 넣고, 화면(Streamlit) secrets나 저장소에는 절대 넣지 않는다. 프로젝트 URL(`https://<프로젝트 ref>.supabase.co`)도 함께 적어 둔다.
 5. **이메일 확인 설정**: Authentication의 **Sign In / Providers → Email**에 있는 **Confirm email**.
@@ -320,6 +321,7 @@ python backend/scripts/smoke_test.py
 | Render 서비스가 정지됨 | 월 750시간 소진 | 다음 달까지 기다리거나 다른 워크스페이스 사용 |
 | 운영 화면에 실시간 로그가 안 옴 | `/ready`의 `redis:false` | `REDIS_URL`·리전 확인 |
 | 수정·평가 저장이 실패(서버 로그에 `action` 열 없음) | `0008_feedback_action.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0008_feedback_action.sql` 실행(여러 번 실행해도 안전) |
+| 비교표 적합도 열이 “불러오지 못함”, 항목 가중치 화면 오류(서버 로그에 `weight_profiles` 등 테이블 없음) | `0120_scoring.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0120_scoring.sql` 실행(여러 번 실행해도 안전) |
 
 ## 확인 필요 (공식 문서로 끝까지 확인하지 못한 것)
 

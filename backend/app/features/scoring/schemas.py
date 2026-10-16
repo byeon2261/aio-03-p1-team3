@@ -107,6 +107,7 @@ class ScoringSettingOut(BaseModel):
     weight_profile_id: str | None = None
     weight_profile_name: str | None = None
     updated_at: dt.datetime | None = None   # 설정한 적 없으면 None
+    items: list[str] = Field(default_factory=lambda: list(SCORE_ITEMS))   # 평가 항목(화면이 입력칸을 그릴 때 씀)
 
 
 # ------------------------------------------------------------------ 점수·순위
