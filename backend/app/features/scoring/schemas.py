@@ -27,6 +27,11 @@ def _check_item_keys(items: list) -> list:
     return items
 
 
+# ------------------------------------------------------------------ 평가 항목
+class ScoreItemsOut(BaseModel):
+    items: list[str] = Field(examples=[list(SCORE_ITEMS)])   # SCORE_ITEMS 순서
+
+
 # ------------------------------------------------------------------ 가중치 프로필
 class WeightItemIn(BaseModel):
     item_key: str = Field(examples=["채광"])
@@ -130,7 +135,7 @@ class ScoresOut(BaseModel):
 
 
 __all__ = [
-    "WeightItemIn", "WeightItemOut", "WeightProfileIn", "WeightProfileOut",
+    "ScoreItemsOut", "WeightItemIn", "WeightItemOut", "WeightProfileIn", "WeightProfileOut",
     "SatisfactionItemIn", "SatisfactionItemOut", "SatisfactionIn", "SatisfactionOut",
     "ScoringSettingIn", "ScoringSettingOut", "ScoreRow", "ScoresOut", "NAME_MAX_CHARS",
 ]

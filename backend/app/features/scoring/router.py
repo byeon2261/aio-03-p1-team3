@@ -1,5 +1,6 @@
 """F12 항목 가중치화 API.
 
+GET               /score-items                        평가 항목 목록(SCORE_ITEMS)
 GET·POST          /weight-profiles                    가중치 프로필 목록·만들기(계정 단위)
 GET·PUT·DELETE    /weight-profiles/{profile_id}        프로필 하나 조회·통째로 고치기·삭제
 GET·PUT           /listings/{listing_id}/satisfaction  매물 항목별 만족도 조회·통째로 바꾸기
@@ -16,8 +17,9 @@ from app.core.db import Database, get_user_db
 from app.core.ownership import get_owned_listing, get_owned_session
 from app.core.schemas import OkOut
 from app.features.scoring import service
+from app.features.scoring.items import SCORE_ITEMS
 from app.features.scoring.schemas import (
-    SatisfactionIn, SatisfactionOut, ScoresOut, ScoringSettingIn, ScoringSettingOut, WeightProfileIn,
+    ScoreItemsOut, SatisfactionIn, SatisfactionOut, ScoresOut, ScoringSettingIn, ScoringSettingOut, WeightProfileIn,
     WeightProfileOut,
 )
 
@@ -25,6 +27,12 @@ router = APIRouter(tags=["scoring"])
 
 
 # ------------------------------------------------------------------ 가중치 프로필
+@router.get("/score-items", response_model=ScoreItemsOut)
+def read_score_items(user: CurrentUser = Depends(get_current_user)) -> ScoreItemsOut:
+    """만족도·가중치를 매기는 항목. 프로필이 하나도 없을 때도 화면이 입력칸을 그릴 수 있게 따로 둔다."""
+    return ScoreItemsOut(items=list(SCORE_ITEMS))
+
+
 @router.get("/weight-profiles", response_model=list[WeightProfileOut])
 def list_weight_profiles(user: CurrentUser = Depends(get_current_user),
                          db: Database = Depends(get_user_db)) -> list[WeightProfileOut]:

@@ -64,3 +64,11 @@ def ranking_markdown(rows: list[dict]) -> str:
 def hidden_message(data: dict) -> str | None:
     n = sum(int(v or 0) for v in (data.get("hidden_count") or {}).values())
     return f"필터로 {n}건 숨김 · 남은 후보끼리 순위를 매겼습니다" if n > 0 else None
+
+
+def profiles_markdown(profiles: list[dict]) -> str:
+    """WeightProfileOut 목록 → 마크다운 표(이름·가중치)."""
+    lines = ["| 프로필 | 가중치 (0인 항목은 뺌) |", "|---|---|"]
+    for p in profiles:
+        lines.append(f"| **{_md(p.get('name', ''))}** | {_md(weights_summary(p))} |")
+    return "\n".join(lines)

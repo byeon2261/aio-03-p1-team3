@@ -3,6 +3,7 @@
 - session_detail order 25: 항목 가중치 켜기/끄기, 이 세션에 쓸 프로필 고르기, 프로필 만들기·고치기·삭제
 - session_detail order 35: 적합도 순위(비교표 바로 아래). 예산 필터가 켜져 있으면 남은 후보끼리 순위
 - listing_detail order 45: 항목 만족도 입력(0~100, 비우면 미입력)
+- render_profile_manager(): 마이페이지(P4)의 '가중치 프로필' 탭이 부른다(프로필 목록·만들기·고치기·삭제)
 import 시 st 함수를 부르지 않는다.
 """
 
@@ -14,7 +15,7 @@ from core.api import ApiError, api_delete, api_get, api_post, api_put
 from core.state import budget_filter_key
 from core.ui import fmt_kst, show_api_error
 from features.scoring.view import (
-    RULE_NOTE, SATISFACTION_NOTE, hidden_message, profile_label, profile_options, ranking_markdown,
+    RULE_NOTE, SATISFACTION_NOTE, hidden_message, profile_label, profile_options, profiles_markdown, ranking_markdown,
     satisfaction_body, weights_body, weights_summary,
 )
 
@@ -22,6 +23,7 @@ BUDGET_FILTER = "within_budget"
 NEW_PROFILE = "__new__"
 PROFILES_KEY = "scoring_profiles"
 PROFILES_VER_KEY = "scoring_profiles_ver"
+ITEMS_KEY = "scoring_items"
 
 
 def _setting_key(sid: str) -> str:
@@ -133,15 +135,27 @@ def _render_setting(sid: str, setting: dict, profiles: list[dict]) -> None:
                "항목 가중치가 꺼져 있습니다. 켜면 적합도 점수와 순위를 보여 줍니다.")
 
 
-def _profile_editor(profiles: list[dict], items: list[str]) -> None:
+def _load_items() -> list[str] | None:
+    """평가 항목 목록(서버 SCORE_ITEMS). 한 번 받으면 화면 상태에 둔다. 실패하면 None."""
+    if ITEMS_KEY not in st.session_state:
+        try:
+            st.session_state[ITEMS_KEY] = (api_get("/score-items") or {}).get("items") or []
+        except ApiError as e:
+            show_api_error(e)
+            _retry_button("scoring_items_retry")
+            return None
+    return list(st.session_state[ITEMS_KEY])
+
+
+def _profile_editor(profiles: list[dict], items: list[str], prefix: str = "sd") -> None:
     ver = st.session_state.get(PROFILES_VER_KEY, 0)
     targets = [NEW_PROFILE] + [p["id"] for p in profiles]
-    target = st.selectbox("고칠 프로필", targets, key=f"scoring_edit_target:{ver}",
+    target = st.selectbox("고칠 프로필", targets, key=f"scoring_edit_target:{prefix}:{ver}",
                           format_func=lambda t: "새 프로필 만들기" if t == NEW_PROFILE else profile_label(t, profiles))
     profile = next((p for p in profiles if p["id"] == target), None)
     base = {w["item_key"]: w["weight"] for w in (profile or {}).get("weights") or []}
 
-    with st.form(f"scoring_profile_form:{target}:{ver}", border=False):
+    with st.form(f"scoring_profile_form:{prefix}:{target}:{ver}", border=False):
         name = st.text_input("프로필 이름", value=(profile or {}).get("name", ""), max_chars=30,
                              placeholder="예: 여름 6개월")
         st.caption("항목별 중요도 0~100. 합이 100이 아니어도 비율로 맞춰 계산합니다.")
@@ -150,7 +164,7 @@ def _profile_editor(profiles: list[dict], items: list[str]) -> None:
         for i, item in enumerate(items):
             with cols[i % 3]:
                 weights[item] = st.slider(item, 0, 100, value=int(base.get(item, 50 if profile is None else 0)),
-                                          step=5, key=f"scoring_w:{target}:{ver}:{item}")
+                                          step=5, key=f"scoring_w:{prefix}:{target}:{ver}:{item}")
         b1, b2 = st.columns(2)
         save = b1.form_submit_button("프로필 저장", type="primary", width="stretch")
         delete = b2.form_submit_button("프로필 삭제", width="stretch", disabled=profile is None,
@@ -199,8 +213,29 @@ def render_scoring_settings(ctx: dict) -> None:
             return
         _render_setting(sid, setting, profiles)
         with st.expander("가중치 프로필 만들기·고치기"):
-            _profile_editor(profiles, list(setting.get("items") or []))
+            _profile_editor(profiles, list(setting.get("items") or []), prefix="sd")
+            st.caption("마이페이지의 '가중치 프로필' 탭에서도 만들고 고칠 수 있습니다.")
         st.caption(RULE_NOTE)
+
+
+# ------------------------------------------------------------------ 마이페이지 탭
+def render_profile_manager() -> None:
+    """마이페이지 '가중치 프로필' 탭. 세션과 상관없이 계정의 프로필을 보고 만들고 고친다."""
+    st.subheader("가중치 프로필")
+    st.caption("계절·기간마다 항목별 중요도를 묶어 두고, 세션 화면의 '항목 가중치'에서 세션마다 하나를 고릅니다.")
+    _show_flash("profiles")
+    profiles = _load_profiles()
+    items = _load_items()
+    if profiles is None or items is None:
+        return
+    if profiles:
+        st.markdown(profiles_markdown(profiles))
+    else:
+        st.info("아직 만든 프로필이 없습니다. 아래에서 첫 프로필을 만드세요(예: 여름 6개월·겨울 6개월).")
+    st.divider()
+    st.markdown("**만들기·고치기**")
+    _profile_editor(profiles, items, prefix="mp")
+    st.caption(RULE_NOTE)
 
 
 # ------------------------------------------------------------------ 적합도 순위 (order 35)
