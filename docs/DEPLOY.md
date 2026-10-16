@@ -47,6 +47,54 @@ pip install -r backend/requirements.txt -r frontend/requirements.txt
 
 Supabase·Gemini 값은 2·3절에서 받는다. 두 파일은 git에 올리지 않는다(`.gitignore`에 있음).
 
+### Windows에서 Docker Compose 준비
+
+`compose.yaml`에는 로컬 Redis 호환 저장소인 Valkey가 설정되어 있다. Docker Desktop을 설치하면 Docker CLI와 Compose도 함께 사용할 수 있다.
+
+1. PowerShell에서 Docker Desktop을 설치한다.
+
+   ```powershell
+   winget install --id Docker.DockerDesktop --exact --source winget
+   ```
+
+2. Docker Desktop을 실행하고 WSL 2 엔진을 사용한다. WSL 설치·업데이트가 필요하다는 안내가 나오면 관리자 PowerShell에서 다음 명령을 실행한다. 재부팅 안내가 있으면 재부팅한 뒤 Docker Desktop을 다시 실행한다.
+
+   ```powershell
+   wsl --install --no-distribution
+   wsl --update
+   ```
+
+3. IDE와 터미널을 다시 열고 Docker 엔진이 준비되었는지 확인한다. `docker version`에 Client와 Server가 모두 표시되어야 한다.
+
+   ```powershell
+   docker version
+   docker compose version
+   ```
+
+4. 저장소 루트에서 실행하고 연결을 확인한다.
+
+   ```powershell
+   cd C:\aio-03-p1-team3
+   docker compose config --quiet
+   docker compose up -d
+   docker compose ps
+   docker compose exec -T valkey valkey-cli ping
+   ```
+
+   `valkey`가 `healthy`, ping 결과가 `PONG`이면 정상이다. `backend/.env`에는 `REDIS_URL=redis://localhost:6379/0`을 설정한다. 포트는 `127.0.0.1:6379`에만 열리며 FastAPI와 Streamlit은 아래 명령으로 각각 실행한다.
+
+문제 확인: `docker compose logs --tail 50 valkey`. 종료: `docker compose down`.
+
+`wsl --version`에서 `REGDB_E_CLASSNOTREG` 오류가 나면 Microsoft 공식 WSL MSI를 설치한 뒤 재부팅한다.
+
+```powershell
+winget install --id Microsoft.WSL --exact --source winget --installer-type wix
+```
+
+WSL 설치가 오류 코드 `1618`(다른 설치 진행 중)로 끝나면 다른 설치가 끝난 뒤 다시 시도한다. Windows 기능 활성화 후 재부팅이 필요한 상태라면 먼저 재부팅한다.
+
+설치와 WSL 요구 사항은 [Docker 공식 Windows 설치 안내](https://docs.docker.com/desktop/setup/install/windows-install/)를 참고한다.
+
 ### 0-3. 실행 (터미널 3개)
 
 ```bash
