@@ -1,4 +1,4 @@
-"""마이페이지(key mypage, order 80): 닉네임, 비밀번호 변경, 내 사진, 요약, 가중치 프로필(F12)."""
+"""마이페이지(key mypage, order 80): 닉네임, 비밀번호 변경, 내 사진, 요약, 가중치 프로필(F12), 내 발품 후기(F14)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from core.api import ApiError, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
 from features.photos.components import photo_grid, show_flash
 from features.scoring.sections import render_profile_manager   # F12 가중치 프로필 탭
+from features.community.mypage_tab import render_my_posts   # F14 내 발품 후기 탭
 
 NICKNAME_MAX = 20
 PASSWORD_MIN = 6           # Supabase Auth 기본 최소 길이(서버 정책을 따른다)
@@ -155,7 +156,8 @@ def render_mypage() -> None:
     nick_msg = st.session_state.pop("mypage_flash:nickname", None)
     if nick_msg:
         st.success(nick_msg)
-    tab_info, tab_photos, tab_summary, tab_weights = st.tabs(["내 정보", "내 사진", "요약", "가중치 프로필"])
+    tab_info, tab_photos, tab_summary, tab_weights, tab_balpum = st.tabs(
+        ["내 정보", "내 사진", "요약", "가중치 프로필", "내 발품 후기"])
     with tab_info:
         _nickname_form()
         st.divider()
@@ -166,6 +168,8 @@ def render_mypage() -> None:
         _summary()
     with tab_weights:
         render_profile_manager()
+    with tab_balpum:
+        render_my_posts()
 
 
 PAGES = [{"key": "mypage", "title": "마이페이지", "order": 80, "admin_only": False, "render": render_mypage}]

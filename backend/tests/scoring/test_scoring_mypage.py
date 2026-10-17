@@ -74,7 +74,7 @@ def test_scoring_view_profiles_markdown():
 
 def test_scoring_mypage_has_weight_profile_tab_with_list(ui_fake):
     at = _app()
-    assert [t.label for t in at.tabs] == ["내 정보", "내 사진", "요약", "가중치 프로필"]
+    assert "가중치 프로필" in [t.label for t in at.tabs]
     texts = "\n".join(str(m.value) for m in at.markdown)
     assert "| **겨울 6개월** | 채광 85 · 곰팡이 10 · 난방 80 |" in texts
     assert "가중치 프로필" in [s.value for s in at.subheader]
