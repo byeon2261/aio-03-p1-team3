@@ -3,6 +3,7 @@
 > I1(통합 확인)에서 고침: 합친 결과에 맞춘 등록 규칙(1·7절), 형식 실패 표기, 기능 폴더 상속 모델(3절), 실제 응답 모델·기본값(4절), 추가 오류 코드·eval 저장 방식(5절), api.py 401 처리(6절).
 > I2(계약 변경)에서 고침: feedback `action` 열(0008)로 '수정 취소(revert)'와 '메모에 없음(set + null)' 구분(2·3·5절, repo·FeedbackIn/Out·P3 본문·P6 필드 수정 비율 최종 상태 기준), 삭제 전 이벤트 payload에 `storage` 추가(2절 events).
 > F12(#14)에서 더함: 항목 가중치화 — 3절 상속 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 슬롯·열 key.
+> F14(#21)에서 더함: 발품 후기 — 3절 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 페이지·마이페이지 탭.
 
 R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/conftest.py`·`fakes.py`, `frontend/app.py`, `frontend/core/*`, `supabase/migrations/*`)은 고치지 않는다. 바꿀 것이 있으면 REPORT "계약 변경 요청"에 적고 계약 안에서 우회한다.
 
@@ -62,6 +63,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - P6 `features/admin_logs/feedback_cases.py`: `FeedbackCaseOut`(FeedbackAdminOut + `memo_head`, `analysis_summary`)
 - P7 `features/evals/schemas.py`: `EvalRunSummaryOut`(EvalRunOut + failure_counts, result_count, error_case_count), `EvalResultDetailOut`(EvalResultOut + case_id, memo_text, criteria, expected_json, mixed_listings_match, compare_output_json, compare_mixed_listings_match), `EvalCompareOut`(EvalResultsOut + condition_mismatches, run·compare_run은 EvalRunSummaryOut, results는 EvalResultDetailOut)
 - F12 `features/scoring/schemas.py`(계약 모델을 상속하지 않는 새 모델): `WeightProfileIn{name(1~30, 앞뒤 공백 제거), weights: [WeightItemIn{item_key, weight(0~100)}]}`(빠진 항목은 0), `WeightProfileOut{id, name, weights: [WeightItemOut] (SCORE_ITEMS 전체·순서), created_at, updated_at}`, `SatisfactionIn{items: [SatisfactionItemIn{item_key, satisfaction(0~100)}]}`(빠진 항목 = 미입력, 통째로 바꿈), `SatisfactionOut{listing_id, items: [SatisfactionItemOut{item_key, satisfaction|null}], entered_count, updated_at}`, `ScoringSettingIn{enabled, weight_profile_id|null}`, `ScoringSettingOut{session_id, enabled(기본 true), weight_profile_id, weight_profile_name, updated_at, items}`, `ScoresOut{session_id, setting: ScoringSettingOut, items, rows: [ScoreRow{listing_id, listing_no, label, score|null, rank|null, entered_count, total_items}], hidden_count}`. item_key는 `features/scoring/items.py`의 `SCORE_ITEMS`(기본 = CHECKLIST) 중 하나, 아니거나 중복이면 422
+- F14 `features/community/schemas.py`(새 모델): `PostIn{address(1~200), topic, title(1~100), body(1~3000), floor|null(-10~200, 0 제외), visit_date|null}`(글자는 앞뒤 공백 제거, 제목·본문에 전화번호·이메일 모양이 있으면 422 reason `contact_info`), `PostUpdateIn`(보낸 칸만 바꿈, 필수 칸은 null 불가), `PostSummaryOut{id, address, floor, topic, visit_date, title, nickname, is_mine, has_photo, created_at, updated_at}`, `PostOut`(PostSummaryOut + body, photo: `PostPhotoOut{id, content_type, size_bytes, url, url_expires_at}`|null), `TopicsOut{topics}`. topic은 `구조·설비`·`소음`·`채광`·`주변 환경`·`기타`. 작성자 id·이메일은 응답에 넣지 않는다
 
 ## 4. 엔드포인트
 | 담당 | 메서드 경로 | 요청 → 응답 |
@@ -94,11 +96,15 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | F12 | GET·PUT /listings/{listing_id}/satisfaction | SatisfactionOut · SatisfactionIn → SatisfactionOut |
 | F12 | GET·PUT /sessions/{session_id}/scoring | ScoringSettingOut(설정 없으면 켜짐·프로필 없음) · ScoringSettingIn → ScoringSettingOut |
 | F12 | GET /sessions/{session_id}/scores?filters=a,b | ScoresOut(필터 통과 매물끼리 순위, 꺼져 있으면 rows 빈 목록) |
+| F14 | GET /community/topics | TopicsOut |
+| F14 | GET·POST /community/posts | list[PostSummaryOut](최신순, `address` 부분 일치·`floor`·`topic`·`mine`, `limit` 기본 50·최대 200) · PostIn → PostOut |
+| F14 | GET·PATCH·DELETE /community/posts/{post_id} | PostOut(로그인 사용자 모두) · PostUpdateIn → PostOut(작성자만) · OkOut(작성자만, 사진 파일 먼저 삭제) |
+| F14 | POST·DELETE /community/posts/{post_id}/photo | multipart `file`(JPG·PNG, 5MB, 글당 1장, 있으면 바꿈) → PostOut · PostOut(작성자만) |
 /admin/*는 `require_admin`.
 
 ## 5. 오류 코드·테이블
 오류: AUTH_REQUIRED·INVALID_CREDENTIALS 401, EMAIL_NOT_CONFIRMED·FORBIDDEN 403, SESSION/LISTING/ANALYSIS/PHOTO/DRAFT_NOT_FOUND 404, DRAFT_EXPIRED 410, VALIDATION_ERROR 422(detail.fields: loc·type·msg만), AI_RATE_LIMITED 429, INTERNAL_ERROR 500, AI_FORMAT_ERROR 502, CONFIG_MISSING·KV_UNAVAILABLE·CLEANUP_FAILED 503, AI_TIMEOUT 504.
-기능이 추가한 오류(I1 반영): AI_UPSTREAM_ERROR 502(그 밖의 Gemini 오류, P2), STORAGE_UNAVAILABLE 503(사진 업로드 실패, P4), EVAL_CASES_EMPTY·EVAL_RUN_IN_PROGRESS 409, EVAL_RUN_NOT_FOUND 404(P7). WEIGHT_PROFILE_NOT_FOUND 404(없거나 남의 가중치 프로필, F12). 화면 문구는 `frontend/core/ui.py`의 `ERROR_MESSAGES`.
+기능이 추가한 오류(I1 반영): AI_UPSTREAM_ERROR 502(그 밖의 Gemini 오류, P2), STORAGE_UNAVAILABLE 503(사진 업로드 실패, P4), EVAL_CASES_EMPTY·EVAL_RUN_IN_PROGRESS 409, EVAL_RUN_NOT_FOUND 404(P7). WEIGHT_PROFILE_NOT_FOUND 404(없거나 남의 가중치 프로필, F12). POST_NOT_FOUND 404(없는 발품 후기, F14), 남의 후기를 고치거나 지우면 FORBIDDEN 403(F14, 남의 글도 읽을 수는 있으므로 404가 아님). 화면 문구는 `frontend/core/ui.py`의 `ERROR_MESSAGES`.
 
 | 테이블 | 쓰기 담당 | 메모 |
 |---|---|---|
@@ -112,7 +118,8 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | request_logs | R 미들웨어 | admin db 전용 |
 | eval_cases·eval_runs·eval_results | P7 | admin db 전용. 채점 기준 글은 `eval_cases.expected_json`의 `_criteria` 키(전용 열 없음, 채점·응답 expected에서는 빼고 `criteria`로 따로 준다). `eval_results.status`는 `success` 또는 파이프라인 오류 코드, `failure_codes`는 NUM·HAL·MIS·CHK·FMT. AI 원문(raw_output)은 저장하지 않는다 |
 | weight_profiles·weight_items·listing_satisfactions·session_scoring | F12 | (0120) 항목 행은 대상별로 지우고 다시 넣어 통째로 바꾼다. session_scoring PK session_id, weight_profile_id는 프로필 삭제 시 SET NULL. item_key에 목록 CHECK 없음(SCORE_ITEMS가 정함) |
-CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블 포함), request_logs.profile_id만 SET NULL. 읽기는 누구나.
+| community_posts·community_post_photos | F14 | (0140) 읽기는 로그인 사용자 모두, 쓰기·고치기·지우기는 작성자(profile_id)만. 사진은 글당 1장(post_id UNIQUE), 파일은 `listing-photos`의 `{auth.uid()}/community/{post_id}/…` 경로이고 두 번째 폴더가 `community`인 파일만 로그인 사용자 읽기 Storage 정책을 더했다. 작성자 닉네임은 admin db로 읽는다 |
+CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블 포함)과 profiles→F14 테이블, request_logs.profile_id만 SET NULL. 읽기는 누구나.
 
 ## 6. 화면 (frontend/core)
 - `api.py`: `api_get/post/put/patch/delete(path, *, json=None, params=None, files=None)`, `api_stream(path, params=None)`(SSE, {"event","data","id"}), `ApiError(status, code, message, detail)`. 토큰 자동, 만료 임박·401이면 1회 갱신 후 재시도, 대기 90초. 갱신한 토큰으로도 401 `INVALID_CREDENTIALS`면(예: `/me/password` 현재 비밀번호 틀림) 로그인을 유지하고 오류만 낸다. 그 밖의 401은 로그인 상태를 지운다. 연결 실패 status 0 NETWORK_ERROR/TIMEOUT.
@@ -120,7 +127,7 @@ CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블
 - `nav.py`: `go_sessions()`, `go_session_detail(sid)`, `go_listing_detail(lid)`, `go_page(key)`. on_click 콜백이 아닌 본문(`if st.button(...)`)에서 부른다.
 - `slots.py`: `render_slot(slot, ctx)`. `ui.py`: `fmt_manwon(v)`("미기재"/"500만원"), `fmt_kst(t)`, `show_api_error(e)`(코드별 문구+다음 할 일), `privacy_notice()`.
 - 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10, P5 예산 20, F12 항목 가중치 25, P3 비교표 30, F12 적합도 순위 35. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40, F12 항목 만족도 45.
-- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필, 마지막 탭은 F12 `features.scoring.sections.render_profile_manager()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
+- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, F14 발품 후기 쓰기 60 `balpum_write`, F14 발품 후기 목록 65 `balpum_list`, P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필·내 발품 후기, 가중치 프로필 탭은 F12 `features.scoring.sections.render_profile_manager()`, 마지막 탭은 F14 `features.community.mypage_tab.render_my_posts()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
 - 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용), 비교표 열 key `score`(F12, order 20). F12 순위 섹션은 `budget_filter_key(sid)`를 읽어 같은 필터로 `/scores`를 부른다.
 
 ## 7. 테스트
