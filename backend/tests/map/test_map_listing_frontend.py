@@ -91,9 +91,21 @@ def test_location_logic_helpers():
     assert logic.address_text(None) == ""
     assert logic.address_text(LOC) == "가상시 예시구 샘플로 1 (샘플빌라)"
     assert logic.address_text({"parcel_address": "가상시 예시구 샘플동 1-1"}) == "가상시 예시구 샘플동 1-1"
-    pins = logic.session_pins([{"listing_id": LID1, "listing_no": 1, "label": "1번 집", "location": LOC}])
-    assert pins == [{"id": LID1, "label": "1번 집", "detail": "가상시 예시구 샘플로 1 (샘플빌라)",
-                     "latitude": 37.55, "longitude": 126.97, "clickable": True}]
+    assert logic.manwon_text(None) == "미기재" and logic.manwon_text(40) == "40만원"
+    assert logic.manwon_text(1000) == "1,000만원" and logic.manwon_text(10000) == "1억"
+    assert logic.manwon_text(23500) == "2억 3,500만원"
+    pin = {"listing_id": LID1, "listing_no": 1, "label": "1번 집", "location": LOC, "analyzed": True,
+           "deposit_manwon": 1000, "monthly_rent_manwon": 40, "maintenance_fee_manwon": None}
+    assert logic.session_pins([pin]) == [{
+        "id": LID1, "label": "1번 집", "detail": "가상시 예시구 샘플로 1 (샘플빌라)", "latitude": 37.55,
+        "longitude": 126.97, "link": True, "note": None,
+        "rows": [{"label": "보증금", "value": "1,000만원", "muted": False},
+                 {"label": "월세", "value": "40만원", "muted": False}]}]
+    with_fee = logic.pin_rows({**pin, "monthly_rent_manwon": None, "maintenance_fee_manwon": 7})
+    assert with_fee[1] == {"label": "월세", "value": "미기재", "muted": True}
+    assert with_fee[2]["value"] == "7만원"
+    not_analyzed = logic.session_pins([{**pin, "analyzed": False}])[0]
+    assert not_analyzed["rows"] == [] and "AI 정리 전" in not_analyzed["note"]
     body = logic.location_body({"id": 0, "ok": True, "latitude": 37.5, "longitude": 127.0, "roadAddress": "도로",
                                 "parcelAddress": "", "zonecode": "04323", "buildingName": ""})
     assert body == {"road_address": "도로", "parcel_address": None, "postal_code": "04323", "building_name": None,

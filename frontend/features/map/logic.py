@@ -100,10 +100,36 @@ def address_text(location: dict | None) -> str:
     return text
 
 
+def manwon_text(value: int | None) -> str:
+    """만원 단위 금액 → '1,000만원', '1억 2,000만원', '2억'. None은 '미기재'."""
+    if value is None:
+        return "미기재"
+    value = int(value)
+    if value >= 10000:
+        eok, rest = divmod(value, 10000)
+        return f"{eok}억" + (f" {rest:,}만원" if rest else "")
+    return f"{value:,}만원"
+
+
+def pin_rows(pin: dict) -> list[dict]:
+    """정보 카드의 금액 줄. 보증금·월세는 늘 보이고, 관리비는 적혀 있을 때만."""
+    if not pin.get("analyzed"):
+        return []
+    rows = [{"label": "보증금", "value": manwon_text(pin.get("deposit_manwon"))},
+            {"label": "월세", "value": manwon_text(pin.get("monthly_rent_manwon"))}]
+    if pin.get("maintenance_fee_manwon") is not None:
+        rows.append({"label": "관리비", "value": manwon_text(pin["maintenance_fee_manwon"])})
+    for row in rows:
+        row["muted"] = row["value"] == "미기재"
+    return rows
+
+
 def session_pins(pins: list[dict]) -> list[dict]:
-    """GET /sessions/{id}/locations 결과 → 핀 지도 데이터."""
+    """GET /sessions/{id}/locations 결과 → 핀 지도 데이터(정보 카드: 이름·주소·금액·매물 상세 보기)."""
     return [{"id": p["listing_id"], "label": p["label"], "detail": address_text(p["location"]),
-             "latitude": p["location"]["latitude"], "longitude": p["location"]["longitude"], "clickable": True}
+             "latitude": p["location"]["latitude"], "longitude": p["location"]["longitude"],
+             "rows": pin_rows(p), "note": None if p.get("analyzed") else "AI 정리 전이라 금액이 아직 없습니다.",
+             "link": True}
             for p in pins]
 
 

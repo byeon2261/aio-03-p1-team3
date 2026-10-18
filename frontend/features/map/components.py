@@ -453,7 +453,7 @@ export default function(component) {
   if (!state) {
     state = {
       map: null, started: false, disposed: false, markers: [], overlays: [], listeners: [],
-      info: null, temp: null, lastPins: "", lastGeocode: null,
+      card: null, temp: null, lastPins: "", lastGeocode: null,
     };
     parentElement.__mapPins = state;
   }
@@ -467,8 +467,93 @@ export default function(component) {
     statusEl.classList.toggle("map-pins-error", error);
   }
 
+  function closeCard() {
+    state.card?.setMap(null);
+    state.card = null;
+  }
+
+  function buildCard(pin) {
+    const card = document.createElement("div");
+    card.className = "map-pin-card";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-label", pin.label + " 정보");
+    for (const type of ["mousedown", "touchstart", "dblclick", "wheel"]) {
+      card.addEventListener(type, event => event.stopPropagation());
+    }
+
+    const head = document.createElement("div");
+    head.className = "map-pin-card__head";
+    const badge = document.createElement("span");
+    badge.className = "map-pin-card__badge";
+    badge.textContent = pin.label;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "map-pin-card__close";
+    close.setAttribute("aria-label", "닫기");
+    close.textContent = "×";
+    close.addEventListener("click", event => {
+      event.stopPropagation();
+      closeCard();
+    });
+    head.append(badge, close);
+    card.append(head);
+
+    if (pin.detail) {
+      const address = document.createElement("p");
+      address.className = "map-pin-card__address";
+      address.textContent = pin.detail;
+      card.append(address);
+    }
+    if ((pin.rows || []).length) {
+      const list = document.createElement("dl");
+      list.className = "map-pin-card__rows";
+      for (const row of pin.rows) {
+        const term = document.createElement("dt");
+        term.textContent = row.label;
+        const value = document.createElement("dd");
+        value.textContent = row.value;
+        if (row.muted) value.classList.add("is-muted");
+        list.append(term, value);
+      }
+      card.append(list);
+    }
+    if (pin.note) {
+      const note = document.createElement("p");
+      note.className = "map-pin-card__note";
+      note.textContent = pin.note;
+      card.append(note);
+    }
+    if (pin.link) {
+      const link = document.createElement("a");
+      link.className = "map-pin-card__link";
+      link.href = "#";
+      link.setAttribute("role", "button");
+      link.textContent = "매물 상세 보기";
+      link.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        state.trigger("open", pin.id);
+      });
+      card.append(link);
+    }
+    return card;
+  }
+
+  function openCard(pin, position) {
+    closeCard();
+    const maps = window.kakao.maps;
+    state.card = new maps.CustomOverlay({
+      position, content: buildCard(pin), xAnchor: 0.5, yAnchor: 1, zIndex: 20, clickable: true,
+    });
+    state.card.setMap(state.map);
+    // 카드가 지도 위쪽에 잘리지 않도록 핀을 지도 아래쪽(가운데에서 140px 아래)에 오게 옮긴다
+    const projection = state.map.getProjection();
+    const point = projection.containerPointFromCoords(position);
+    state.map.panTo(projection.coordsFromContainerPoint(new maps.Point(point.x, point.y - 140)));
+  }
+
   function clearPins() {
-    state.info?.close();
+    closeCard();
     for (const [marker, listener] of state.listeners) {
       window.kakao.maps.event.removeListener(marker, "click", listener);
     }
@@ -487,26 +572,19 @@ export default function(component) {
     clearPins();
     const maps = window.kakao.maps;
     const bounds = new maps.LatLngBounds();
-    state.info = state.info || new maps.InfoWindow({removable: true});
     for (const pin of pins) {
       const position = new maps.LatLng(pin.latitude, pin.longitude);
       const marker = new maps.Marker({position, map: state.map, title: pin.label});
-      const label = document.createElement("div");
+      const label = document.createElement("button");
+      label.type = "button";
       label.className = "map-pins-label";
       label.textContent = pin.label;
-      const overlay = new maps.CustomOverlay({position, content: label, yAnchor: 2.9, map: state.map});
-      const listener = () => {
-        const content = document.createElement("div");
-        content.style.padding = "4px 8px";
-        const title = document.createElement("strong");
-        title.textContent = pin.label;
-        const detail = document.createElement("p");
-        detail.textContent = pin.detail || "";
-        content.append(title, detail);
-        state.info.setContent(content);
-        state.info.open(state.map, marker);
-        if (pin.clickable) state.trigger("clicked", pin.id);
-      };
+      const overlay = new maps.CustomOverlay({position, content: label, yAnchor: 2.9, map: state.map, clickable: true});
+      const listener = () => openCard(pin, position);
+      label.addEventListener("click", event => {
+        event.stopPropagation();
+        listener();
+      });
       maps.event.addListener(marker, "click", listener);
       state.listeners.push([marker, listener]);
       state.markers.push(marker);
@@ -578,6 +656,8 @@ export default function(component) {
         level: first ? 4 : 7,
       });
       state.geocoder = new maps.services.Geocoder();
+      state.mapClick = () => closeCard();
+      maps.event.addListener(state.map, "click", state.mapClick);
       state.observer = new ResizeObserver(() => {
         const center = state.map.getCenter();
         state.map.relayout();
@@ -593,7 +673,10 @@ export default function(component) {
   return () => {
     state.disposed = true;
     state.observer?.disconnect();
-    if (state.map) clearPins();
+    if (state.map) {
+      clearPins();
+      window.kakao.maps.event.removeListener(state.map, "click", state.mapClick);
+    }
     state.temp?.setMap(null);
     delete parentElement.__mapPins;
   };
@@ -609,15 +692,94 @@ PINS_CSS = """
   background: var(--st-secondary-background-color);
 }
 .map-pins-label {
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 999px;
   background: #1d4ed8;
   color: #fff;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.4;
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.35);
 }
+.map-pins-label:hover { background: #1e40af; }
+.map-pin-card {
+  position: relative;
+  box-sizing: border-box;
+  width: 232px;
+  margin-bottom: 80px;          /* 마커와 이름표 위로 띄운다 */
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+.map-pin-card::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  transform: translateX(-50%) rotate(45deg);
+  box-shadow: 3px 3px 6px rgba(15, 23, 42, 0.06);
+}
+.map-pin-card__head { display: flex; align-items: center; justify-content: space-between; }
+.map-pin-card__badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 700;
+}
+.map-pin-card__close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.map-pin-card__close:hover { background: #f1f5f9; color: #475569; }
+.map-pin-card__address { margin: 8px 0 0; color: #64748b; font-size: 12px; word-break: keep-all; }
+.map-pin-card__rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+.map-pin-card__rows dt { margin: 0; color: #64748b; }
+.map-pin-card__rows dd { margin: 0; text-align: right; font-weight: 700; color: #0f172a; }
+.map-pin-card__rows dd.is-muted { font-weight: 500; color: #94a3b8; }
+.map-pin-card__note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; }
+.map-pin-card__link {
+  display: block;
+  margin-top: 12px;
+  padding: 9px 0;
+  border-radius: 10px;
+  background: #1d4ed8;
+  color: #ffffff !important;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none !important;
+}
+.map-pin-card__link::after { content: " →"; }
+.map-pin-card__link:hover { background: #1e40af; }
 .map-pins-status { margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
 .map-pins-error { color: #dc2626; opacity: 1; }
 """
@@ -675,19 +837,20 @@ def current_api_key() -> str:
 
 
 def pins_map(api_key: str, pins: list[dict], *, key: str, geocode: dict | None = None,
-             height: int = 360, on_click=None):
-    """핀 지도. pins = [{id, label, detail, latitude, longitude, clickable}].
+             height: int = 360):
+    """핀 지도. pins = [{id, label, detail, latitude, longitude, rows, note, link}].
 
     geocode = {id, query, address}를 주면 그 주소를 좌표로 바꿔 임시 핀을 찍고 결과를 돌려준다
     (돌려받은 값의 .geocoded = {id, ok, latitude, longitude, roadAddress, parcelAddress, zonecode, buildingName}).
-    핀을 누르면 on_click이 불리고 .clicked에 핀 id가 들어 있다.
+    핀(또는 이름표)을 누르면 정보 카드가 열린다. 카드의 '매물 상세 보기'를 누르면 .open에 핀 id가 들어 있다.
+    핀 항목: rows=[{label, value, muted}], note, link(True면 '매물 상세 보기').
     """
     return _pins()(
         key=key,
         data={"apiKey": api_key, "pins": pins, "geocode": geocode, "height": height},
         default={"geocoded": None},
         on_geocoded_change=lambda: None,
-        on_clicked_change=on_click or (lambda: None),
+        on_open_change=lambda: None,
         height=height + 30,
     )
 

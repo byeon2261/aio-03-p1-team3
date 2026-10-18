@@ -1,7 +1,7 @@
 """F13 내 매물 위치 화면 부품. import할 때 st 함수를 부르지 않는다.
 
 - render_session_map(session, listings): 세션 상세 '매물' 목록 옆 지도(P1 sessions/sections.py가 부름).
-  위치를 넣은 매물만 핀으로 찍고, 핀을 누르면 그 매물을 열 수 있다.
+  위치를 넣은 매물만 핀으로 찍고, 핀을 누르면 이름·주소·보증금·월세 카드가 열리며 '매물 상세 보기'로 이동한다.
 - render_listing_location(ctx): 매물 상세 슬롯 listing_detail order 50 '위치'.
   카카오 주소 검색으로 주소를 고르면 지도 SDK가 좌표로 바꾸고, 확인 후 저장한다.
 주소는 메모와 따로 저장되고 본인만 본다. AI 분석에는 보내지 않는다.
@@ -22,10 +22,6 @@ NO_KEY_NOTE = ("카카오 JavaScript 키가 없어 지도를 표시할 수 없�
 
 
 # ------------------------------------------------------------------ 세션 상세: 매물 목록 옆 지도
-def _clicked_key(sid: str) -> str:
-    return f"map_session_clicked:{sid}"
-
-
 def render_session_map(session: dict, listings: list[dict]) -> None:
     sid = session["id"]
     try:
@@ -41,20 +37,12 @@ def render_session_map(session: dict, listings: list[dict]) -> None:
     if not api_key:
         st.info(NO_KEY_NOTE)
     else:
-        map_key = f"map_session_pins:{sid}"
-
-        def _on_click() -> None:
-            st.session_state[_clicked_key(sid)] = (st.session_state.get(map_key) or {}).get("clicked")
-
-        components.pins_map(api_key, logic.session_pins(pins), key=map_key, height=360, on_click=_on_click)
+        result = components.pins_map(api_key, logic.session_pins(pins), key=f"map_session_pins:{sid}", height=400)
+        opened = getattr(result, "open", None)
+        if opened and any(p["listing_id"] == opened for p in pins):
+            nav.go_listing_detail(opened)   # 카드의 '매물 상세 보기'
     if missing > 0:
         st.caption(f"위치가 없는 매물 {missing}곳은 지도에 없습니다.")
-
-    clicked = next((p for p in pins if p["listing_id"] == st.session_state.get(_clicked_key(sid))), None)
-    if clicked:
-        st.caption(f"선택: {clicked['label']} · {logic.address_text(clicked['location'])}")
-        if st.button(f"{clicked['label']} 열기", key=f"map_open_listing:{clicked['listing_id']}"):
-            nav.go_listing_detail(clicked["listing_id"])
 
 
 # ------------------------------------------------------------------ 매물 상세: 위치
@@ -101,7 +89,7 @@ def render_listing_location(ctx: dict) -> None:
         _show_saved(location)
         if api_key:
             pin = {"id": lid, "label": label, "detail": logic.address_text(location),
-                   "latitude": location["latitude"], "longitude": location["longitude"], "clickable": False}
+                   "latitude": location["latitude"], "longitude": location["longitude"], "link": False}
             components.pins_map(api_key, [pin], key=f"map_loc_saved:{lid}", height=280)
     else:
         st.info("아직 위치가 없습니다. 주소를 검색해 저장하면 세션 화면의 매물 지도에 표시됩니다.")

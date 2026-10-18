@@ -95,7 +95,13 @@ class ListingLocationOut(BaseModel):
 
 
 class SessionPinOut(BaseModel):
+    """세션 지도 핀. 금액은 최신 성공 분석 + 사용자 수정값(비교표와 같은 값), 없거나 미기재면 null."""
+
     listing_id: str
     listing_no: int = Field(examples=[1])
     label: str = Field(examples=["1번 집"])
     location: LocationOut
+    deposit_manwon: int | None = Field(default=None, description="보증금(만원)", examples=[1000])
+    monthly_rent_manwon: int | None = Field(default=None, description="월세(만원)", examples=[40])
+    maintenance_fee_manwon: int | None = Field(default=None, description="관리비(만원)", examples=[7])
+    analyzed: bool = Field(default=False, description="성공한 AI 분석이 있는지(없으면 금액이 모두 null)")

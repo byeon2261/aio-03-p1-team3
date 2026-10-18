@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.sessions.helpers import create_listing, create_session, error_code
+from tests.sessions.helpers import create_listing, create_session, error_code, insert_analysis
 
 MIGRATION = Path(__file__).resolve().parents[3] / "supabase" / "migrations" / "0131_listing_locations.sql"
 # 테스트용 가짜 주소(좌표는 서울 안의 아무 점)
@@ -62,6 +62,23 @@ def test_location_empty_then_save_update_delete(owner):
     assert c.delete(url).json() == {"ok": True}
     assert c.get(url).json()["location"] is None
     assert c.delete(url).status_code == 200   # 없어도 성공
+
+
+def test_session_pins_include_money_from_analysis(owner, memory_db, make_user):
+    """핀 금액 = 최신 성공 분석 + 사용자 수정값(비교표와 같은 값). 분석이 없으면 analyzed False·금액 null."""
+    c, session, first, second = owner
+    c.put(f"/listings/{first['id']}/location", json=LOC)
+    c.put(f"/listings/{second['id']}/location", json=LOC)
+    analysis = insert_analysis(memory_db, first["id"], first["memo_text"])
+    memory_db.update("analyses", {"id": analysis["id"]}, {"result_json": {
+        "deposit_manwon": 1000, "monthly_rent_manwon": 40, "maintenance_fee_manwon": None}})
+    memory_db.insert("feedback", {"analysis_id": analysis["id"], "profile_id": make_user().profile_id,
+                                  "field_name": "monthly_rent_manwon", "corrected_value": 45, "action": "set"})
+    pins = {p["label"]: p for p in c.get(f"/sessions/{session['id']}/locations").json()}
+    assert pins["1번 집"]["analyzed"] is True
+    assert (pins["1번 집"]["deposit_manwon"], pins["1번 집"]["monthly_rent_manwon"]) == (1000, 45)
+    assert pins["1번 집"]["maintenance_fee_manwon"] is None
+    assert pins["2번 집"]["analyzed"] is False and pins["2번 집"]["deposit_manwon"] is None
 
 
 def test_session_pins_only_listings_with_location(owner):

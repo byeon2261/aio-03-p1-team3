@@ -9,7 +9,8 @@ import datetime as dt
 from typing import Any
 
 from app.core.db import Database, UniqueViolation
-from app.core.repo import list_listings
+from app.core.repo import field_overrides, latest_analysis, list_listings
+from app.core.values import MONEY_FIELDS, effective_values
 from app.features.map.schemas import ListingLocationOut, LocationIn, LocationOut, SessionPinOut
 
 TABLE = "listing_locations"
@@ -49,8 +50,17 @@ def delete(db: Database, listing_id: Any) -> None:
     db.delete(TABLE, {"listing_id": str(listing_id)})
 
 
+def money_of(db: Database, listing_id: Any) -> dict[str, Any]:
+    """최신 성공 분석에 사용자 수정값을 덮은 금액(비교표와 같은 값). 분석이 없으면 analyzed=False."""
+    success = latest_analysis(db, listing_id)
+    if success is None:
+        return {"analyzed": False}
+    values = effective_values(success.get("result_json"), field_overrides(db, success["id"]))
+    return {"analyzed": True, **{k: values.get(k) for k in MONEY_FIELDS}}
+
+
 def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
-    """세션 매물 중 위치가 있는 것만, 매물 번호 순."""
+    """세션 매물 중 위치가 있는 것만, 매물 번호 순. 팝업에 보일 금액을 붙인다."""
     listings = list_listings(db, session_id)
     if not listings:
         return []
@@ -61,5 +71,6 @@ def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
         row = by_listing.get(str(listing["id"]))
         if row:
             pins.append(SessionPinOut(listing_id=str(listing["id"]), listing_no=int(listing["listing_no"]),
-                                      label=label_of(listing), location=LocationOut.model_validate(row)))
+                                      label=label_of(listing), location=LocationOut.model_validate(row),
+                                      **money_of(db, listing["id"])))
     return pins
