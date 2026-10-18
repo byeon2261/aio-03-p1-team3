@@ -28,7 +28,7 @@ house-tour-notes/
 │  ├─ features/<기능>/               백엔드와 같은 대화창 (pages.py, sections.py, 부품)
 │  └─ requirements/                  backend와 같은 규칙
 ├─ .streamlit/                       R: secrets.toml.example · P8: config.toml
-├─ supabase/migrations/              R · F12: 0120_scoring.sql · F13: 0130_map_listings.sql, 0131_listing_locations.sql · F14: 0140_community.sql
+├─ supabase/migrations/              R · F12: 0120_scoring.sql · F13: 0131_listing_locations.sql, 0132_drop_map_listings.sql · F14: 0140_community.sql
 ├─ eval/                             P7
 ├─ docs/                             R: CONTRACT.md, OWNERS.md · P6: METRICS.md · P8: DEPLOY.md, DEMO_CHECKLIST.md, EXTENSION.md, USABILITY_EVAL.md
 ├─ compose.yaml                      P8 (로컬용 Redis 호환 저장소 하나)
@@ -52,8 +52,8 @@ house-tour-notes/
 | P8 | 배포·문서 | scripts/smoke_test.py | .streamlit/config.toml, compose.yaml, render.yaml |
 | F12 (#14) | 항목 가중치화(적합도 점수) | features/scoring | features/scoring |
 | F14 (#21) | 발품 후기(주소별 후기 커뮤니티) | features/community | features/community |
-| F13 | 전체 매물 지도·매물 위치(+서울역 더미 매물 API) | features/map | features/map |
+| F13 | 전체 매물 지도·매물 위치 | features/map | features/map |
 
 F10은 건형, F11은 은지가 이후 다듬는다. F12는 민성, F13은 건형, F14는 영은 담당.
 
-예약 번호: 마이그레이션 0004·0005는 비워 둠, 0120~ F12(0120_scoring.sql 사용) · 0130~ F13(0130_map_listings.sql, 0131_listing_locations.sql 사용) · 0140~ F14(0140_community.sql 사용).
+예약 번호: 마이그레이션 0004·0005는 비워 둠, 0120~ F12(0120_scoring.sql 사용) · 0130~ F13(0131_listing_locations.sql, 0132_drop_map_listings.sql 사용, 0130은 비워 둠) · 0140~ F14(0140_community.sql 사용).

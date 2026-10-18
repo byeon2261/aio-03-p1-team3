@@ -1,4 +1,4 @@
--- 0131_listing_locations.sql — F13 내 매물 위치(주소·좌표). 0001~0130 뒤에 실행한다.
+-- 0131_listing_locations.sql — F13 내 매물 위치(주소·좌표). 0001~0120 뒤에 실행한다.
 -- Supabase SQL 편집기에 그대로 붙여 실행한다. 여러 번 실행해도 안전하게 썼다.
 --
 -- listing_locations  매물(listings) 하나당 위치 하나. 사용자가 매물 상세의 '위치'에서 카카오 주소 검색으로

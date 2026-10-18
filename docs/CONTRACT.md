@@ -6,7 +6,7 @@
 > F14(#21)에서 더함: 발품 후기 — 3절 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 페이지·마이페이지 탭.
 > F11(#23)에서 더함: 예산 판정 상세 — 3절 모델, 4절 엔드포인트와 요청·응답 예시(판정 규칙·DB는 그대로).
 > F13에서 더함: 동네 지도 탐색(옛 demo_st 이전) — 3절 모델, 4절 엔드포인트, 5절 테이블, 6절 페이지.
-> F13에서 더함: 지도(옛 demo_st 이전, 이후 '전체 매물' 페이지로 바꿈) — 3절 모델, 4절 엔드포인트, 5절 테이블, 6절 페이지.
+> F13에서 더함: 지도(옛 demo_st 이전, 이후 '전체 매물' 페이지로 바꿈, 서울역 더미 매물은 0132로 삭제) — 3절 모델, 4절 엔드포인트, 5절 테이블, 6절 페이지.
 > F13에서 더함: 내 매물 위치 — 3절 모델, 4절 엔드포인트, 5절 테이블, 6절 슬롯(listing_detail 50, 세션 상세 매물 목록 옆 지도).
 
 R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/conftest.py`·`fakes.py`, `frontend/app.py`, `frontend/core/*`, `supabase/migrations/*`)은 고치지 않는다. 바꿀 것이 있으면 REPORT "계약 변경 요청"에 적고 계약 안에서 우회한다.
@@ -69,7 +69,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - F12 `features/scoring/schemas.py`(계약 모델을 상속하지 않는 새 모델): `WeightProfileIn{name(1~30, 앞뒤 공백 제거), weights: [WeightItemIn{item_key, weight(0~100)}]}`(빠진 항목은 0), `WeightProfileOut{id, name, weights: [WeightItemOut] (SCORE_ITEMS 전체·순서), created_at, updated_at}`, `SatisfactionIn{items: [SatisfactionItemIn{item_key, satisfaction(0~100)}]}`(빠진 항목 = 미입력, 통째로 바꿈), `SatisfactionOut{listing_id, items: [SatisfactionItemOut{item_key, satisfaction|null}], entered_count, updated_at}`, `ScoringSettingIn{enabled, weight_profile_id|null}`, `ScoringSettingOut{session_id, enabled(기본 true), weight_profile_id, weight_profile_name, updated_at, items}`, `ScoresOut{session_id, setting: ScoringSettingOut, items, rows: [ScoreRow{listing_id, listing_no, label, score|null, rank|null, entered_count, total_items}], hidden_count}`. item_key는 `features/scoring/items.py`의 `SCORE_ITEMS`(기본 = CHECKLIST) 중 하나, 아니거나 중복이면 422
 - F14 `features/community/schemas.py`(새 모델): `PostIn{address(1~200), topic, title(1~100), body(1~3000), floor|null(-10~200, 0 제외), visit_date|null}`(글자는 앞뒤 공백 제거, 제목·본문에 전화번호·이메일 모양이 있으면 422 reason `contact_info`), `PostUpdateIn`(보낸 칸만 바꿈, 필수 칸은 null 불가), `PostSummaryOut{id, address, floor, topic, visit_date, title, nickname, is_mine, has_photo, created_at, updated_at}`, `PostOut`(PostSummaryOut + body, photo: `PostPhotoOut{id, content_type, size_bytes, url, url_expires_at}`|null), `TopicsOut{topics}`. topic은 `구조·설비`·`소음`·`채광`·`주변 환경`·`기타`. 작성자 id·이메일은 응답에 넣지 않는다
 - F11 `features/budget/schemas.py`(새 모델): `BudgetEvaluationsOut{session_id, budget_set, counts: BudgetCountsOut{within, over, unknown}, items: [BudgetEvaluationOut{listing_id, listing_no, label, status(within|over|unknown|null), status_label, reason, missing: list[str], next_action|null}]}`. status·reason은 `service.evaluate` 그대로(비교표 `budget` 열·`within_budget` 필터와 같은 판정), `missing`·`next_action`은 unknown일 때만 채우는 안내용
-- F13 `features/map/schemas.py`(새 모델): `MapSearchOut{origin: MapOriginOut{latitude, longitude}, radius_m, count, listings: [MapListingOut]}`, `MapListingOut{id, title, area_name, property_type, lease_type(월세·전세), deposit_manwon, monthly_rent_manwon|null(전세면 null), area_m2, floor, latitude, longitude, road_address|null, parcel_address|null, postal_code|null, building_name|null, address_source_url|null, address_verified_on|null, distance_m}`. 주소 칸은 실제 주소 샘플만 있고 가상 매물은 null. 내 매물 위치: `LocationIn{road_address|null(≤200), parcel_address|null(≤200), postal_code|null(숫자 5자리), building_name|null(≤100), latitude(33~39), longitude(124~132)}`(앞뒤 공백 제거·빈 칸은 null, 도로명·지번 중 하나 필수, 아니면 422), `LocationOut`(LocationIn 칸 + updated_at), `ListingLocationOut{listing_id, location: LocationOut|null}`, `SessionPinOut{listing_id, listing_no, label, location: LocationOut, deposit_manwon|null, monthly_rent_manwon|null, maintenance_fee_manwon|null, analyzed}`(금액은 최신 성공 분석 + 사용자 수정값, 비교표와 같은 값)
+- F13 `features/map/schemas.py`(새 모델): 내 매물 위치: `LocationIn{road_address|null(≤200), parcel_address|null(≤200), postal_code|null(숫자 5자리), building_name|null(≤100), latitude(33~39), longitude(124~132)}`(앞뒤 공백 제거·빈 칸은 null, 도로명·지번 중 하나 필수, 아니면 422), `LocationOut`(LocationIn 칸 + updated_at), `ListingLocationOut{listing_id, location: LocationOut|null}`, `SessionPinOut{listing_id, listing_no, label, location: LocationOut, deposit_manwon|null, monthly_rent_manwon|null, maintenance_fee_manwon|null, analyzed}`(금액은 최신 성공 분석 + 사용자 수정값, 비교표와 같은 값)
 
 ## 4. 엔드포인트
 | 담당 | 메서드 경로 | 요청 → 응답 |
@@ -107,7 +107,6 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | F14 | GET·POST /community/posts | list[PostSummaryOut](최신순, `address` 부분 일치·`floor`·`topic`·`mine`, `limit` 기본 50·최대 200) · PostIn → PostOut |
 | F14 | GET·PATCH·DELETE /community/posts/{post_id} | PostOut(로그인 사용자 모두) · PostUpdateIn → PostOut(작성자만) · OkOut(작성자만, 사진 파일 먼저 삭제) |
 | F14 | POST·DELETE /community/posts/{post_id}/photo | multipart `file`(JPG·PNG, 5MB, 글당 1장, 있으면 바꿈) → PostOut · PostOut(작성자만) |
-| F13 | GET /map/listings?latitude=&longitude=&radius_m= | MapSearchOut(로그인 사용자 모두, 반경 300·500·1000만, 그 밖은 422 reason `radius_m`, 위도 33~39·경도 124~132, 직선거리 가까운 순) |
 | F13 | GET·PUT·DELETE /listings/{listing_id}/location | ListingLocationOut(없으면 location null) · LocationIn → ListingLocationOut(있으면 통째로 바꿈) · OkOut(없어도 성공). 남의 매물은 404 LISTING_NOT_FOUND |
 | F13 | GET /me/locations | MyPinsOut{pins: [MyPinOut](SessionPinOut + session_id, session_title, memo_text, analysis_status, needs_reanalysis, 세션 최신순 → 매물 번호 순), listing_count(위치 없는 매물 포함)} |
 | F13 | GET /sessions/{session_id}/locations | list[SessionPinOut](위치가 있는 매물만, listing_no 순). 남의 세션은 404 SESSION_NOT_FOUND |
@@ -183,7 +182,6 @@ GET /sessions/6f1c2a3e-0000-4000-8000-000000000001/budget/evaluations
 | eval_cases·eval_runs·eval_results | P7 | admin db 전용. 채점 기준 글은 `eval_cases.expected_json`의 `_criteria` 키(전용 열 없음, 채점·응답 expected에서는 빼고 `criteria`로 따로 준다). `eval_results.status`는 `success` 또는 파이프라인 오류 코드, `failure_codes`는 NUM·HAL·MIS·CHK·FMT. AI 원문(raw_output)은 저장하지 않는다 |
 | weight_profiles·weight_items·listing_satisfactions·session_scoring | F12 | (0120) 항목 행은 대상별로 지우고 다시 넣어 통째로 바꾼다. session_scoring PK session_id, weight_profile_id는 프로필 삭제 시 SET NULL. item_key에 목록 CHECK 없음(SCORE_ITEMS가 정함) |
 | community_posts·community_post_photos | F14 | (0140) 읽기는 로그인 사용자 모두, 쓰기·고치기·지우기는 작성자(profile_id)만. 사진은 글당 1장(post_id UNIQUE), 파일은 `listing-photos`의 `{auth.uid()}/community/{post_id}/…` 경로이고 두 번째 폴더가 `community`인 파일만 로그인 사용자 읽기 Storage 정책을 더했다. 작성자 닉네임은 admin db로 읽는다 |
-| map_listings | F13 (마이그레이션만) | (0130) 서울역 주변 더미 매물 30개(실제 주소 샘플 9개 + 가상 21개, 값은 `features/map/seed.py`와 같음). 로그인 사용자 읽기 전용, 쓰기는 service_role만. 개인 매물(listings)과 무관 |
 | listing_locations | F13 | (0131) PK listing_id(매물당 하나, 매물 삭제 시 CASCADE), 소유 사슬 RLS. 도로명·지번 중 하나 필수(CHECK). 좌표는 화면의 카카오 지도 SDK가 바꾼 값. 메모와 따로 두고 AI에 보내지 않는다 |
 CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블 포함)과 profiles→F14 테이블, request_logs.profile_id만 SET NULL. 읽기는 누구나.
 
