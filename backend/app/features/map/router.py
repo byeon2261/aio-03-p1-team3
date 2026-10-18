@@ -1,5 +1,5 @@
 """F13 지도 탐색: GET /map/listings · 내 매물 위치: GET·PUT·DELETE /listings/{listing_id}/location,
-GET /sessions/{session_id}/locations
+GET /sessions/{session_id}/locations, GET /me/locations(전체 매물 지도)
 
 - 로그인한 사용자만 쓴다(없으면 401). 더미 매물은 모두가 같은 데이터를 읽는다(RLS: 로그인 사용자 읽기 전용).
 - 반경은 300·500·1000m 중 하나(그 밖은 422 VALIDATION_ERROR). 위도·경도는 한국 근처 범위만 받는다.
@@ -19,7 +19,7 @@ from app.core.ownership import get_owned_listing, get_owned_session
 from app.core.schemas import OkOut
 from app.features.map import locations, service
 from app.features.map.schemas import (
-    ListingLocationOut, LocationIn, MapListingOut, MapOriginOut, MapSearchOut, SessionPinOut,
+    ListingLocationOut, LocationIn, MapListingOut, MapOriginOut, MapSearchOut, MyPinsOut, SessionPinOut,
 )
 
 router = APIRouter(tags=["map"])
@@ -71,3 +71,10 @@ def list_session_locations(session_id: str, user: CurrentUser = Depends(get_curr
                            db: Database = Depends(get_user_db)) -> list[SessionPinOut]:
     session = get_owned_session(db, user, session_id)
     return locations.session_pins(db, session["id"])
+
+
+@router.get("/me/locations", response_model=MyPinsOut)
+def list_my_locations(user: CurrentUser = Depends(get_current_user),
+                      db: Database = Depends(get_user_db)) -> MyPinsOut:
+    """전체 매물 지도: 내 모든 세션에서 위치를 넣은 매물(금액·세션 이름 포함)."""
+    return locations.my_pins(db, user.profile_id)

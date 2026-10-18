@@ -17,7 +17,7 @@ house-tour-notes/
 │  │     ├─ evals/                   P7  F9
 │     └─ scoring/                 F12 (담당 민성)
 │     └─ community/               F14 발품 후기 (담당 영은)
-│     └─ map/                     F13 동네 지도 탐색 (담당 건형)
+│     └─ map/                     F13 지도·전체 매물·매물 위치 (담당 건형)
 │  ├─ tests/conftest.py, fakes.py    R
 │  ├─ tests/<기능>/                  그 기능을 만든 대화창
 │  ├─ requirements/base.txt          R
@@ -52,7 +52,7 @@ house-tour-notes/
 | P8 | 배포·문서 | scripts/smoke_test.py | .streamlit/config.toml, compose.yaml, render.yaml |
 | F12 (#14) | 항목 가중치화(적합도 점수) | features/scoring | features/scoring |
 | F14 (#21) | 발품 후기(주소별 후기 커뮤니티) | features/community | features/community |
-| F13 | 동네 지도 탐색(서울역 주변 더미 매물) | features/map | features/map |
+| F13 | 전체 매물 지도·매물 위치(+서울역 더미 매물 API) | features/map | features/map |
 
 F10은 건형, F11은 은지가 이후 다듬는다. F12는 민성, F13은 건형, F14는 영은 담당.
 

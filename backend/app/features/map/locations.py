@@ -11,7 +11,9 @@ from typing import Any
 from app.core.db import Database, UniqueViolation
 from app.core.repo import field_overrides, latest_analysis, list_listings
 from app.core.values import MONEY_FIELDS, effective_values
-from app.features.map.schemas import ListingLocationOut, LocationIn, LocationOut, SessionPinOut
+from app.features.map.schemas import (
+    ListingLocationOut, LocationIn, LocationOut, MyPinOut, MyPinsOut, SessionPinOut,
+)
 
 TABLE = "listing_locations"
 
@@ -74,3 +76,28 @@ def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
                                       label=label_of(listing), location=LocationOut.model_validate(row),
                                       **money_of(db, listing["id"])))
     return pins
+
+
+def my_pins(db: Database, profile_id: Any) -> MyPinsOut:
+    """내 모든 세션의 매물 중 위치가 있는 것. 세션 만든 순(최신 먼저) → 매물 번호 순."""
+    sessions = db.select("tour_sessions", {"profile_id": str(profile_id)}, order_by="created_at", desc=True)
+    if not sessions:
+        return MyPinsOut(pins=[], listing_count=0)
+    listings = db.select("listings", {"session_id": [str(s["id"]) for s in sessions]})
+    if not listings:
+        return MyPinsOut(pins=[], listing_count=0)
+    rows = db.select(TABLE, {"listing_id": [str(x["id"]) for x in listings]})
+    by_listing = {str(r["listing_id"]): r for r in rows}
+    by_session: dict[str, list[dict]] = {}
+    for listing in listings:
+        by_session.setdefault(str(listing["session_id"]), []).append(listing)
+    pins = []
+    for session in sessions:
+        for listing in sorted(by_session.get(str(session["id"]), []), key=lambda x: int(x["listing_no"])):
+            row = by_listing.get(str(listing["id"]))
+            if row:
+                pins.append(MyPinOut(listing_id=str(listing["id"]), listing_no=int(listing["listing_no"]),
+                                     label=label_of(listing), location=LocationOut.model_validate(row),
+                                     session_id=str(session["id"]), session_title=session.get("title") or "",
+                                     **money_of(db, listing["id"])))
+    return MyPinsOut(pins=pins, listing_count=len(listings))

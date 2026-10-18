@@ -18,7 +18,7 @@ from features.map import components, logic
 
 PRIVACY_NOTE = "주소는 메모와 따로 저장되고 나만 볼 수 있습니다. AI 분석에는 보내지 않습니다."
 NO_KEY_NOTE = ("카카오 JavaScript 키가 없어 지도를 표시할 수 없습니다. "
-               "frontend/.env·Streamlit secrets의 KAKAO_JAVASCRIPT_KEY를 설정하거나 '동네 지도 탐색'에서 키를 입력하세요.")
+               "frontend/.env·Streamlit secrets의 KAKAO_JAVASCRIPT_KEY를 설정하거나 '전체 매물'에서 키를 입력하세요.")
 
 
 # ------------------------------------------------------------------ 세션 상세: 매물 목록 옆 지도

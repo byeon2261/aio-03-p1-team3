@@ -121,3 +121,32 @@ def test_location_blank_optional_fields_become_null(owner):
 def test_migration_parses():
     pglast = pytest.importorskip("pglast")
     assert len(pglast.parse_sql(MIGRATION.read_text(encoding="utf-8"))) > 5
+
+
+# ------------------------------------------------------------------ 전체 매물 지도
+def test_my_locations_across_sessions(client_as, make_user, memory_db, owner):
+    c, session, first, second = owner
+    other_session = create_session(c, title="일요일 집 보기")
+    third = create_listing(c, other_session["id"])
+    c.put(f"/listings/{first['id']}/location", json=LOC)
+    c.put(f"/listings/{third['id']}/location", json={**LOC, "latitude": 37.57})
+    analysis = insert_analysis(memory_db, first["id"], first["memo_text"])
+    memory_db.update("analyses", {"id": analysis["id"]}, {"result_json": {
+        "deposit_manwon": 1000, "monthly_rent_manwon": 40, "maintenance_fee_manwon": 7}})
+
+    body = c.get("/me/locations").json()
+    assert body["listing_count"] == 3                       # 위치 없는 2번 집도 센다
+    pins = {(p["session_title"], p["label"]): p for p in body["pins"]}
+    assert set(pins) == {("토요일 집 보기", "1번 집"), ("일요일 집 보기", "1번 집")}
+    sat = pins[("토요일 집 보기", "1번 집")]
+    assert sat["session_id"] == session["id"] and sat["listing_id"] == first["id"]
+    assert (sat["deposit_manwon"], sat["monthly_rent_manwon"], sat["analyzed"]) == (1000, 40, True)
+    assert pins[("일요일 집 보기", "1번 집")]["analyzed"] is False
+
+    # 남의 매물은 보이지 않는다
+    other = client_as(make_user())
+    assert other.get("/me/locations").json() == {"pins": [], "listing_count": 0}
+
+
+def test_my_locations_requires_login(client_as):
+    assert client_as(None).get("/me/locations").status_code == 401

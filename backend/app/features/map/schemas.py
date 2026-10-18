@@ -105,3 +105,15 @@ class SessionPinOut(BaseModel):
     monthly_rent_manwon: int | None = Field(default=None, description="월세(만원)", examples=[40])
     maintenance_fee_manwon: int | None = Field(default=None, description="관리비(만원)", examples=[7])
     analyzed: bool = Field(default=False, description="성공한 AI 분석이 있는지(없으면 금액이 모두 null)")
+
+
+class MyPinOut(SessionPinOut):
+    """전체 매물 지도 핀: 세션 핀 + 어느 세션의 매물인지."""
+
+    session_id: str
+    session_title: str = Field(examples=["토요일 집 보기"])
+
+
+class MyPinsOut(BaseModel):
+    pins: list[MyPinOut]
+    listing_count: int = Field(description="내 매물 전체 수(위치가 없는 매물 포함)", examples=[5])
