@@ -1,7 +1,8 @@
-"""F13 지도 탐색 부품: 카카오 지도·카카오 주소 검색 창(Streamlit Custom Components v2).
+"""F13 지도 부품: 지도 탐색용 카카오 지도·매물 핀 지도·카카오 주소 검색 창(Streamlit Custom Components v2).
 
 변건형님 지도 데모(옛 demo_st/main.py)의 JavaScript를 그대로 옮기고, 가상 매물 팝업은 동 단위 지역만 보여 주도록 바꿨다.
-import 시 st 함수를 부르지 않는다(컴포넌트는 처음 쓸 때 만든다).
+import 시 st 함수를 부르지 않는다. 컴포넌트는 쓸 때마다 선언한다(같은 이름은 덮어쓰고, 모듈에 캐시하면
+Streamlit 런타임이 바뀔 때 등록이 사라져 'is not registered' 오류가 난다).
 """
 
 from __future__ import annotations
@@ -403,6 +404,224 @@ export default function(component) {
 }
 """
 
+PINS_JS = """
+let sdkPromise;
+let sdkKey;
+
+function loadSdk(apiKey) {
+  if (sdkPromise) {
+    if (sdkKey !== apiKey) {
+      return Promise.reject(new Error("키를 변경했다면 페이지를 새로고침해 주세요."));
+    }
+    return sdkPromise;
+  }
+  sdkKey = apiKey;
+  sdkPromise = new Promise((resolve, reject) => {
+    if (window.kakao?.maps?.services) {
+      resolve(window.kakao.maps);
+      return;
+    }
+    const script = document.createElement("script");
+    const timer = setTimeout(() => {
+      reject(new Error("지도 로딩 시간이 초과되었습니다. 네트워크와 앱 키를 확인해 주세요."));
+    }, 20000);
+    script.src = "https://dapi.kakao.com/v2/maps/sdk.js?" +
+      new URLSearchParams({appkey: apiKey, autoload: "false", libraries: "services"});
+    script.onload = () => {
+      if (!window.kakao?.maps) {
+        clearTimeout(timer);
+        reject(new Error("카카오 지도 SDK를 불러오지 못했습니다."));
+        return;
+      }
+      window.kakao.maps.load(() => {
+        clearTimeout(timer);
+        resolve(window.kakao.maps);
+      });
+    };
+    script.onerror = () => {
+      clearTimeout(timer);
+      reject(new Error("지도를 불러오지 못했습니다. JavaScript 키와 Web 도메인 등록을 확인해 주세요."));
+    };
+    document.head.appendChild(script);
+  });
+  return sdkPromise;
+}
+
+export default function(component) {
+  const {parentElement, data, setStateValue, setTriggerValue} = component;
+  let state = parentElement.__mapPins;
+  if (!state) {
+    state = {
+      map: null, started: false, disposed: false, markers: [], overlays: [], listeners: [],
+      info: null, temp: null, lastPins: "", lastGeocode: null,
+    };
+    parentElement.__mapPins = state;
+  }
+  state.data = data;
+  state.setState = setStateValue;
+  state.trigger = setTriggerValue;
+  const statusEl = parentElement.querySelector(".map-pins-status");
+
+  function setStatus(text, error = false) {
+    statusEl.textContent = text || "";
+    statusEl.classList.toggle("map-pins-error", error);
+  }
+
+  function clearPins() {
+    state.info?.close();
+    for (const [marker, listener] of state.listeners) {
+      window.kakao.maps.event.removeListener(marker, "click", listener);
+    }
+    state.listeners = [];
+    for (const marker of state.markers) marker.setMap(null);
+    for (const overlay of state.overlays) overlay.setMap(null);
+    state.markers = [];
+    state.overlays = [];
+  }
+
+  function syncPins() {
+    const pins = state.data.pins || [];
+    const serialized = JSON.stringify(pins);
+    if (serialized === state.lastPins) return;
+    state.lastPins = serialized;
+    clearPins();
+    const maps = window.kakao.maps;
+    const bounds = new maps.LatLngBounds();
+    state.info = state.info || new maps.InfoWindow({removable: true});
+    for (const pin of pins) {
+      const position = new maps.LatLng(pin.latitude, pin.longitude);
+      const marker = new maps.Marker({position, map: state.map, title: pin.label});
+      const label = document.createElement("div");
+      label.className = "map-pins-label";
+      label.textContent = pin.label;
+      const overlay = new maps.CustomOverlay({position, content: label, yAnchor: 2.9, map: state.map});
+      const listener = () => {
+        const content = document.createElement("div");
+        content.style.padding = "4px 8px";
+        const title = document.createElement("strong");
+        title.textContent = pin.label;
+        const detail = document.createElement("p");
+        detail.textContent = pin.detail || "";
+        content.append(title, detail);
+        state.info.setContent(content);
+        state.info.open(state.map, marker);
+        if (pin.clickable) state.trigger("clicked", pin.id);
+      };
+      maps.event.addListener(marker, "click", listener);
+      state.listeners.push([marker, listener]);
+      state.markers.push(marker);
+      state.overlays.push(overlay);
+      bounds.extend(position);
+    }
+    if (pins.length === 1) {
+      state.map.setLevel(3);
+      state.map.setCenter(new maps.LatLng(pins[0].latitude, pins[0].longitude));
+    } else if (pins.length > 1) {
+      state.map.setBounds(bounds, 48);
+    }
+  }
+
+  function applyGeocode() {
+    const request = state.data.geocode;
+    if (!request) {
+      state.temp?.setMap(null);
+      state.temp = null;
+      return;
+    }
+    if (request.id === state.lastGeocode) return;
+    state.lastGeocode = request.id;
+    const maps = window.kakao.maps;
+    setStatus("고른 주소의 위치를 찾고 있습니다.");
+    state.geocoder.addressSearch(request.query, (results, status) => {
+      if (state.disposed || state.lastGeocode !== request.id) return;
+      if (status !== maps.services.Status.OK || !results.length) {
+        const notFound = status === maps.services.Status.ZERO_RESULT ||
+          (status === maps.services.Status.OK && !results.length);
+        setStatus(notFound
+          ? "이 주소의 지도 좌표를 찾지 못했습니다. 다른 주소를 골라 주세요."
+          : "주소 좌표 변환에 실패했습니다. 카카오 앱 설정과 네트워크를 확인해 주세요.", true);
+        state.setState("geocoded", {id: request.id, ok: false, notFound});
+        return;
+      }
+      const result = results[0];
+      const picked = request.address || {};
+      const latitude = Number(result.y);
+      const longitude = Number(result.x);
+      const position = new maps.LatLng(latitude, longitude);
+      state.temp?.setMap(null);
+      state.temp = new maps.Marker({position, map: state.map});
+      state.map.setLevel(3);
+      state.map.setCenter(position);
+      setStatus("고른 주소의 위치입니다. 맞으면 저장하세요.");
+      state.setState("geocoded", {
+        id: request.id, ok: true, latitude, longitude,
+        roadAddress: picked.roadAddress || result.road_address?.address_name || "",
+        parcelAddress: picked.parcelAddress || result.address?.address_name || "",
+        zonecode: picked.zonecode || result.road_address?.zone_no || "",
+        buildingName: picked.buildingName || result.road_address?.building_name || "",
+      });
+    });
+  }
+
+  if (state.map) {
+    syncPins();
+    applyGeocode();
+  } else if (!state.started) {
+    state.started = true;
+    loadSdk(data.apiKey).then(maps => {
+      if (state.disposed) return;
+      const first = (state.data.pins || [])[0];
+      const container = parentElement.querySelector(".map-pins-map");
+      container.style.height = (state.data.height || 360) + "px";
+      state.map = new maps.Map(container, {
+        center: new maps.LatLng(first?.latitude ?? 37.5665, first?.longitude ?? 126.978),
+        level: first ? 4 : 7,
+      });
+      state.geocoder = new maps.services.Geocoder();
+      state.observer = new ResizeObserver(() => {
+        const center = state.map.getCenter();
+        state.map.relayout();
+        state.map.setCenter(center);
+      });
+      state.observer.observe(container);
+      setStatus("");
+      syncPins();
+      applyGeocode();
+    }).catch(error => setStatus(error.message, true));
+  }
+
+  return () => {
+    state.disposed = true;
+    state.observer?.disconnect();
+    if (state.map) clearPins();
+    state.temp?.setMap(null);
+    delete parentElement.__mapPins;
+  };
+}
+"""
+
+PINS_CSS = """
+.map-pins-map {
+  width: 100%;
+  height: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--st-secondary-background-color);
+}
+.map-pins-label {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+.map-pins-status { margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
+.map-pins-error { color: #dc2626; opacity: 1; }
+"""
+
 MAP_CSS = """
 .map-explorer-kakao-map {
   width: 100%;
@@ -413,34 +632,78 @@ MAP_CSS = """
 }
 """
 
-_components: dict[str, object] = {}
-
-
 def _postcode():
-    if "postcode" not in _components:
-        _components["postcode"] = st.components.v2.component(
-            "map_explorer_postcode",
-            html="""
-            <p class="map-explorer-postcode-status" role="status">주소 검색창을 불러오는 중입니다.</p>
-            <div class="map-explorer-postcode" aria-label="카카오 주소 검색"></div>
-            """,
-            js=POSTCODE_JS,
-            isolate_styles=False,
-        )
-    return _components["postcode"]
+    return st.components.v2.component(
+        "map_explorer_postcode",
+        html="""
+        <p class="map-explorer-postcode-status" role="status">주소 검색창을 불러오는 중입니다.</p>
+        <div class="map-explorer-postcode" aria-label="카카오 주소 검색"></div>
+        """,
+        js=POSTCODE_JS,
+        isolate_styles=False,
+    )
 
 
 def _kakao_map():
-    if "map" not in _components:
-        _components["map"] = st.components.v2.component(
-            "map_explorer_kakao_map",
-            html='<div class="map-explorer-kakao-map" role="region" aria-label="드래그와 확대가 가능한 카카오 지도"></div>',
-            css=MAP_CSS,
-            js=MAP_JS,
-            # 카카오 SDK가 document에 삽입하는 지도 스타일을 적용한다.
-            isolate_styles=False,
-        )
-    return _components["map"]
+    return st.components.v2.component(
+        "map_explorer_kakao_map",
+        html='<div class="map-explorer-kakao-map" role="region" aria-label="드래그와 확대가 가능한 카카오 지도"></div>',
+        css=MAP_CSS,
+        js=MAP_JS,
+        # 카카오 SDK가 document에 삽입하는 지도 스타일을 적용한다.
+        isolate_styles=False,
+    )
+
+
+def _pins():
+    return st.components.v2.component(
+        "map_listing_pins",
+        html="""
+        <div class="map-pins-map" role="region" aria-label="매물 위치 지도"></div>
+        <p class="map-pins-status" role="status">지도를 불러오는 중입니다.</p>
+        """,
+        css=PINS_CSS,
+        js=PINS_JS,
+        isolate_styles=False,
+    )
+
+
+def current_api_key() -> str:
+    """지도 탐색 화면에서 입력한 키 → secrets·환경변수·frontend/.env 순서."""
+    typed = str(st.session_state.get(logic.KEY_INPUT) or "").strip()
+    return typed or logic.configured_api_key(st.secrets)
+
+
+def pins_map(api_key: str, pins: list[dict], *, key: str, geocode: dict | None = None,
+             height: int = 360, on_click=None):
+    """핀 지도. pins = [{id, label, detail, latitude, longitude, clickable}].
+
+    geocode = {id, query, address}를 주면 그 주소를 좌표로 바꿔 임시 핀을 찍고 결과를 돌려준다
+    (돌려받은 값의 .geocoded = {id, ok, latitude, longitude, roadAddress, parcelAddress, zonecode, buildingName}).
+    핀을 누르면 on_click이 불리고 .clicked에 핀 id가 들어 있다.
+    """
+    return _pins()(
+        key=key,
+        data={"apiKey": api_key, "pins": pins, "geocode": geocode, "height": height},
+        default={"geocoded": None},
+        on_geocoded_change=lambda: None,
+        on_clicked_change=on_click or (lambda: None),
+        height=height + 30,
+    )
+
+
+def pick_address(target_key: str, picker_key: str) -> None:
+    """카카오 주소 검색 창을 띄우고, 고른 주소(dict)를 st.session_state[target_key]에 넣고 다시 그린다."""
+
+    @st.dialog("주소 검색")
+    def _dialog() -> None:
+        result = _postcode()(key=picker_key, on_selected_change=lambda: None, height=510)
+        selected = getattr(result, "selected", None)
+        if selected:
+            st.session_state[target_key] = selected
+            st.rerun()
+
+    _dialog()
 
 
 def open_address_search() -> None:

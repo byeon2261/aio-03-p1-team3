@@ -87,3 +87,33 @@ def map_payload(origin: dict | None, radius_m: int, listings: list[dict]) -> dic
         "radiusM": radius_m,
         "listings": [{**listing, "price": price_text(listing)} for listing in listings],
     }
+
+
+# ------------------------------------------------------------------ 내 매물 위치
+def address_text(location: dict | None) -> str:
+    """저장한 위치를 한 줄로. 도로명 → 지번 순, 건물명은 괄호로."""
+    if not location:
+        return ""
+    text = location.get("road_address") or location.get("parcel_address") or ""
+    if location.get("building_name"):
+        text += f" ({location['building_name']})"
+    return text
+
+
+def session_pins(pins: list[dict]) -> list[dict]:
+    """GET /sessions/{id}/locations 결과 → 핀 지도 데이터."""
+    return [{"id": p["listing_id"], "label": p["label"], "detail": address_text(p["location"]),
+             "latitude": p["location"]["latitude"], "longitude": p["location"]["longitude"], "clickable": True}
+            for p in pins]
+
+
+def location_body(geocoded: dict) -> dict:
+    """핀 지도의 좌표 변환 결과 → PUT /listings/{id}/location 본문."""
+    return {
+        "road_address": geocoded.get("roadAddress") or None,
+        "parcel_address": geocoded.get("parcelAddress") or None,
+        "postal_code": geocoded.get("zonecode") or None,
+        "building_name": geocoded.get("buildingName") or None,
+        "latitude": geocoded["latitude"],
+        "longitude": geocoded["longitude"],
+    }

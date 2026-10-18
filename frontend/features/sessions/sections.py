@@ -1,6 +1,6 @@
 """F2·F3 상세 화면 섹션.
 
-- session_detail (order 10): 매물 목록, 새 메모 입력, 세션 제목·방문일 수정, 세션 삭제
+- session_detail (order 10): 매물 목록(오른쪽에 F13 매물 지도), 새 메모 입력, 세션 제목·방문일 수정, 세션 삭제
 - listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
 """
 
@@ -13,6 +13,7 @@ from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
 from features.sessions.common import flash, parse_date, show_flash, status_next_step, status_text
 from features.sessions.memo_editor import render_memo_editor
+from features.map.listing_map import render_session_map
 
 TITLE_MAX_CHARS = 100
 MEMO_PLACEHOLDER = "예: 보증금 500 / 월세 45 / 관리비 7(인터넷 포함). 3층, 남향. 채광 좋음, 수압 보통. 역까지 도보 8분."
@@ -57,10 +58,15 @@ def _render_listings(session: dict) -> None:
     if not listings:
         st.info("아직 매물이 없습니다. 아래 '새 메모'에 첫 집 메모를 적고 저장하세요.")
         return
-    for lst in listings:
-        _listing_card(lst)
-    if len(listings) == 1:
-        st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
+    cards, map_area = st.columns([3, 2])
+    with cards:
+        for lst in listings:
+            _listing_card(lst)
+        if len(listings) == 1:
+            st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
+    with map_area:
+        # F13: 위치를 넣은 매물을 지도에 찍는다(features/map/listing_map.py)
+        render_session_map(session, listings)
 
 
 def _render_new_memo(session: dict) -> None:

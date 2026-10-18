@@ -154,13 +154,14 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
    6. `supabase/migrations/0008_feedback_action.sql`
    7. `supabase/migrations/0120_scoring.sql` (F12 항목 가중치화)
    8. `supabase/migrations/0130_map_listings.sql` (F13 동네 지도 탐색 더미 매물 30개)
-   9. `supabase/migrations/0140_community.sql` (F14 발품 후기)
+   9. `supabase/migrations/0131_listing_locations.sql` (F13 내 매물 위치)
+   10. `supabase/migrations/0140_community.sql` (F14 발품 후기)
 
    0004·0005는 비워 둔 번호다. 0120~은 F12, 0130~은 F13, 0140~은 F14가 쓴다.
 
    **병합 전에 실행**: Render 서버는 main에 병합되는 즉시 자동으로 새로 배포된다(`render.yaml`의 `autoDeployTrigger: commit`). 그래서 새 마이그레이션이 들어 있는 PR은 승인 뒤 **병합하기 전에** 이 단계처럼 SQL Editor에서 먼저 실행하고, 실행이 끝나면 병합한다. 새 테이블·열만 더하는 마이그레이션은 먼저 실행해도 지금 돌고 있는 서버에 영향이 없다.
 
-   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다. 마찬가지로 `0120_scoring.sql`을 실행하기 전에 새 서버가 뜨면 비교표의 적합도 열이 “불러오지 못함”으로 나오고 항목 가중치 화면이 오류를 낸다. `0140_community.sql`을 실행하기 전에 새 서버가 뜨면 발품 후기 화면이 오류를 낸다. `0130_map_listings.sql`을 실행하기 전에 새 서버가 뜨면 동네 지도 탐색의 주변 매물 목록이 오류를 낸다.
+   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다. 마찬가지로 `0120_scoring.sql`을 실행하기 전에 새 서버가 뜨면 비교표의 적합도 열이 “불러오지 못함”으로 나오고 항목 가중치 화면이 오류를 낸다. `0140_community.sql`을 실행하기 전에 새 서버가 뜨면 발품 후기 화면이 오류를 낸다. `0130_map_listings.sql`을 실행하기 전에 새 서버가 뜨면 동네 지도 탐색의 주변 매물 목록이 오류를 낸다. `0131_listing_locations.sql`을 실행하기 전에 새 서버가 뜨면 세션 상세의 매물 지도와 매물 상세의 '위치'가 오류를 낸다.
 3. **버킷 확인**: Storage 화면에 비공개 버킷 `listing-photos`가 있는지 본다. 없거나 실행 결과에 `bucket insert skipped` 알림이 있으면 **Storage → New bucket**에서 이름 `listing-photos`, Public bucket 끔으로 만들고 `0006_photos.sql`을 한 번 더 실행한다.
 4. **API 키 확인**: **Settings → API Keys**에서 publishable key(`sb_publishable_…`)와 secret key(`sb_secret_…`)를 복사한다. 레거시 `anon`·`service_role` 키는 쓰지 않는다. secret key는 서버(Render) 환경변수에만 넣고, 화면(Streamlit) secrets나 저장소에는 절대 넣지 않는다. 프로젝트 URL(`https://<프로젝트 ref>.supabase.co`)도 함께 적어 둔다.
 5. **이메일 확인 설정**: Authentication의 **Sign In / Providers → Email**에 있는 **Confirm email**.
@@ -334,6 +335,7 @@ python backend/scripts/smoke_test.py
 | 비교표 적합도 열이 “불러오지 못함”, 항목 가중치 화면 오류(서버 로그에 `weight_profiles` 등 테이블 없음) | `0120_scoring.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0120_scoring.sql` 실행(여러 번 실행해도 안전) |
 | 발품 후기 쓰기·목록 화면 오류(서버 로그에 `community_posts` 테이블 없음), 남이 올린 후기 사진이 안 보임 | `0140_community.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0140_community.sql` 실행(여러 번 실행해도 안전, 사진 읽기 Storage 정책 포함) |
 | 동네 지도 탐색에서 "주변 매물을 불러오지 못했습니다"(서버 로그에 `map_listings` 테이블 없음) | `0130_map_listings.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0130_map_listings.sql` 실행(여러 번 실행해도 안전) |
+| 세션 상세 매물 지도·매물 상세 '위치'에 오류(서버 로그에 `listing_locations` 테이블 없음) | `0131_listing_locations.sql`을 실행하지 않고 새 서버를 배포 | 2-2처럼 SQL Editor에서 `0131_listing_locations.sql` 실행(여러 번 실행해도 안전) |
 | 동네 지도 탐색에서 "카카오 JavaScript 키를 입력하면 지도가 표시됩니다" 또는 지도 로딩 실패 | Streamlit Secrets에 `KAKAO_JAVASCRIPT_KEY`가 없거나, 카카오 콘솔 Web 도메인에 배포 주소가 없음 | Streamlit 앱 설정 → Secrets에 `KAKAO_JAVASCRIPT_KEY` 추가, 카카오 개발자 콘솔 Web 도메인에 Streamlit 배포 주소 등록 |
 
 ## 확인 필요 (공식 문서로 끝까지 확인하지 못한 것)

@@ -1,11 +1,12 @@
-"""F13 지도 탐색 응답 모델."""
+"""F13 지도 탐색·내 매물 위치 모델."""
 
 from __future__ import annotations
 
-from datetime import date
+import re
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class MapOriginOut(BaseModel):
@@ -40,3 +41,61 @@ class MapSearchOut(BaseModel):
     radius_m: int = Field(examples=[300])
     count: int = Field(examples=[8])
     listings: list[MapListingOut]
+
+
+# ------------------------------------------------------------------ 내 매물 위치
+_POSTAL_RE = r"^[0-9]{5}$"
+
+
+class LocationIn(BaseModel):
+    """매물 위치 저장. 도로명·지번 중 하나는 있어야 한다. 좌표는 화면의 카카오 지도 SDK가 바꾼 값."""
+
+    road_address: str | None = Field(default=None, max_length=200, examples=["서울특별시 용산구 한강대로 366"])
+    parcel_address: str | None = Field(default=None, max_length=200, examples=["서울특별시 용산구 동자동 56"])
+    postal_code: str | None = Field(default=None, examples=["04323"])
+    building_name: str | None = Field(default=None, max_length=100, examples=["트윈시티남산"])
+    latitude: float = Field(ge=33.0, le=39.0, examples=[37.5511247])
+    longitude: float = Field(ge=124.0, le=132.0, examples=[126.9729133])
+
+    @field_validator("road_address", "parcel_address", "postal_code", "building_name", mode="before")
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("postal_code")
+    @classmethod
+    def _postal(cls, value: str | None) -> str | None:
+        if value is not None and not re.fullmatch(_POSTAL_RE, value):
+            raise ValueError("우편번호는 숫자 5자리입니다.")
+        return value
+
+    @model_validator(mode="after")
+    def _has_address(self) -> "LocationIn":
+        if not self.road_address and not self.parcel_address:
+            raise ValueError("도로명주소나 지번주소 중 하나는 있어야 합니다.")
+        return self
+
+
+class LocationOut(BaseModel):
+    road_address: str | None = None
+    parcel_address: str | None = None
+    postal_code: str | None = None
+    building_name: str | None = None
+    latitude: float
+    longitude: float
+    updated_at: datetime | None = None
+
+
+class ListingLocationOut(BaseModel):
+    listing_id: str
+    location: LocationOut | None = Field(default=None, description="저장한 위치. 없으면 null")
+
+
+class SessionPinOut(BaseModel):
+    listing_id: str
+    listing_no: int = Field(examples=[1])
+    label: str = Field(examples=["1번 집"])
+    location: LocationOut
