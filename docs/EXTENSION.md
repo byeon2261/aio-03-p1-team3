@@ -1,13 +1,13 @@
 # 확장 계획 (F12~F14)
 
-F12·F14는 구현했고(아래 F12·F14 절), F13은 **아직 코드를 만들지 않는다**. 기능마다 “지금 있는 자리”(이미 마련된 연결 지점)와 “나중 계획”을 적는다.
+F12·F14는 구현했고(아래 F12·F14 절), F13은 지도 탐색(서울역 주변 더미 매물 반경 조회)만 먼저 옮겼다(찜·내 매물 주소는 아직). 기능마다 “지금 있는 자리”(이미 마련된 연결 지점)와 “나중 계획”을 적는다.
 각 항목 끝의 표시는 출처다: [요청] 단계 파일에 적힌 내용(F12 절은 담당자가 #14에서, F14 절은 담당자가 #21에서 정한 내용) · [기존 계획] 이 문서의 처음 계획 · [Claude 제안] 문서·구현 때 덧붙인 제안(F13은 착수 때 팀이 정한다).
 
 ## 공통: 새 기능을 붙이는 방법
 
 - 백엔드: `backend/app/features/<이름>/`에 `router.py`(변수 `router`)와 필요하면 `hooks.py`를 두면 자동 등록된다. `hooks.py`의 등록 코드는 여러 번 실행돼도 안전해야 한다. [요청]
 - 프론트: `frontend/features/<이름>/`에 `pages.py`(`PAGES`)·`sections.py`(`SECTIONS`). import 때 Streamlit 함수를 부르지 않는다. [요청]
-- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~` 예약, F14 `0140~`(사용 중: `0140_community.sql`). [요청]
+- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~`(사용 중: `0130_map_listings.sql`), F14 `0140~`(사용 중: `0140_community.sql`). [요청]
 - 추가 패키지는 `backend/requirements/<기능>.txt`·`frontend/requirements/<기능>.txt`에 `==`로 고정한다. [Claude 제안]
 - 새 테이블은 기존처럼 소유 사슬(profile → session → listing)로 RLS를 걸고, 소유 확인은 `core/ownership.py` 방식(타인 리소스는 404)을 따른다. [Claude 제안]
 
@@ -53,6 +53,14 @@ F12·F14는 구현했고(아래 F12·F14 절), F13은 **아직 코드를 만들�
 ---
 
 ## F13 찜·지도 (담당 건형)
+
+### 구현한 것 — 동네 지도 탐색 (옛 `demo_st`를 옮김)
+
+- 사이드바 페이지 **동네 지도 탐색**(key `map`, order 70, 로그인 사용자 모두). `demo_st/main.py`의 카카오 지도·주소 검색·역 검색·반경 300m/500m/1km·매물 목록·지도 영역 좌표 표시를 그대로 옮겼다. `demo_st` 폴더는 남겨 둔다. [요청]
+- 더미 매물은 로컬 JSON 대신 DB 테이블 `map_listings`(`0130_map_listings.sql`)에 30개 넣고, 서버 `GET /map/listings`가 반경 안의 매물을 직선거리 가까운 순으로 준다. 서울역 데모 기준점에서 300m 8개·500m 18개·1km 30개. [요청]
+- 30개 중 9개는 demo_st의 실제 주소 샘플(도로명·지번·우편번호·건물 대표 좌표, 공개 주소자료 출처·확인일 포함), 21개는 좌표까지 가상이고 주소는 동 단위만 둔다. 가격·면적·층수·임대 조건은 모두 가상이다. 실제 주소 사용은 담당자가 정했다(CLAUDE.md 6절의 예외). [요청]
+- 카카오 JavaScript 키는 화면(브라우저)에서 지도 SDK를 불러올 때 쓴다: `st.secrets` → 환경변수 → `frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면에서 입력. 주소 → 좌표 변환도 지금은 화면의 카카오 SDK가 한다(아래 나중 계획의 서버 변환과 다름). [요청]
+- 코드: `backend/app/features/map/`(router·service·schemas·seed), `frontend/features/map/`(pages·components·logic), 테스트 `backend/tests/map/`. [Claude 제안]
 
 ### 지금 있는 자리
 
