@@ -1,13 +1,13 @@
 # 확장 계획 (F12~F14)
 
-F12·F14는 구현했고(아래 F12·F14 절), F13은 **아직 코드를 만들지 않는다**. 기능마다 “지금 있는 자리”(이미 마련된 연결 지점)와 “나중 계획”을 적는다.
+F12·F14는 구현했고(아래 F12·F14 절), F13은 내 매물 위치·세션 매물 지도·전체 매물 지도를 구현했다(찜은 아직). 기능마다 “지금 있는 자리”(이미 마련된 연결 지점)와 “나중 계획”을 적는다.
 각 항목 끝의 표시는 출처다: [요청] 단계 파일에 적힌 내용(F12 절은 담당자가 #14에서, F14 절은 담당자가 #21에서 정한 내용) · [기존 계획] 이 문서의 처음 계획 · [Claude 제안] 문서·구현 때 덧붙인 제안(F13은 착수 때 팀이 정한다).
 
 ## 공통: 새 기능을 붙이는 방법
 
 - 백엔드: `backend/app/features/<이름>/`에 `router.py`(변수 `router`)와 필요하면 `hooks.py`를 두면 자동 등록된다. `hooks.py`의 등록 코드는 여러 번 실행돼도 안전해야 한다. [요청]
 - 프론트: `frontend/features/<이름>/`에 `pages.py`(`PAGES`)·`sections.py`(`SECTIONS`). import 때 Streamlit 함수를 부르지 않는다. [요청]
-- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~` 예약, F14 `0140~`(사용 중: `0140_community.sql`). [요청]
+- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~`(사용 중: `0131_listing_locations.sql`, `0132_drop_map_listings.sql`. `0130`은 지운 더미 매물이 썼던 번호라 다시 쓰지 않음), F14 `0140~`(사용 중: `0140_community.sql`). [요청]
 - 추가 패키지는 `backend/requirements/<기능>.txt`·`frontend/requirements/<기능>.txt`에 `==`로 고정한다. [Claude 제안]
 - 새 테이블은 기존처럼 소유 사슬(profile → session → listing)로 RLS를 걸고, 소유 확인은 `core/ownership.py` 방식(타인 리소스는 404)을 따른다. [Claude 제안]
 
@@ -53,6 +53,22 @@ F12·F14는 구현했고(아래 F12·F14 절), F13은 **아직 코드를 만들�
 ---
 
 ## F13 찜·지도 (담당 건형)
+
+### 구현한 것 — demo_st 지도 이전
+
+- `demo_st/main.py`의 카카오 지도·주소 검색 JavaScript(SDK 로딩·주소 검색 창)를 `frontend/features/map/components.py`로 옮겨 아래 화면들이 쓴다. `demo_st` 폴더는 남겨 둔다. [요청]
+- 처음에는 서울역 주변 더미 매물 30개(`map_listings`, `GET /map/listings`, `0130`)와 반경 검색 화면을 옮겼으나, 화면을 '전체 매물'로 바꾸며 쓰지 않게 되어 지웠다. 이미 0130을 실행한 DB는 `0132_drop_map_listings.sql`로 테이블을 지운다. [요청]
+- 카카오 JavaScript 키는 화면(브라우저)에서 지도 SDK를 불러올 때 쓴다: `st.secrets` → 환경변수 → `frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면에서 입력. 주소 → 좌표 변환도 지금은 화면의 카카오 SDK가 한다(아래 나중 계획의 서버 변환과 다름). [요청]
+- 코드: `backend/app/features/map/`(router·locations·schemas), `frontend/features/map/`(pages·sections·listing_map·components·logic), 테스트 `backend/tests/map/`. [Claude 제안]
+
+### 구현한 것 — 내 매물 위치와 세션 매물 지도
+
+- 사이드바 '전체 매물'(key `map`, 옛 '동네 지도 탐색'을 바꿈): 내 모든 세션에서 위치를 넣은 매물을 사이드바를 뺀 화면 전체 지도에 핀으로 찍는다. 핀 카드는 세션 상세 지도와 같고, 주소 줄 앞에 세션 이름을 붙인다. 왼쪽 위 패널에 위치 있는/없는 매물 수와 매물 목록(세션 상세 매물 카드처럼 대표 사진·N번 집·분석 상태·메모, 여기에 세션 이름·보증금·월세)을 두고, 항목을 누르면 지도가 그 매물로 옮겨 가며 정보 카드가 열린다. 핀을 누르면 목록의 같은 항목이 강조된다. 패널은 [접기]로 접는다. API `GET /me/locations`(메모·분석 상태 포함), 사진은 `GET /me/photos`. [요청]
+- 세션 상세의 '매물' 목록 오른쪽에 지도를 두고, 위치를 넣은 이 세션의 내 매물을 "N번 집" 핀으로 찍는다. 핀(또는 이름표)을 누르면 정보 카드(N번 집·주소·보증금·월세·관리비·[매물 상세 보기])가 열리고, [매물 상세 보기]는 그 매물 상세로 이동한다. 금액은 비교표와 같은 값(최신 성공 분석 + 사용자 수정값), 분석 전이면 안내만 보인다. 위치가 없는 매물 수도 알려 준다. [요청]
+- 매물 상세 슬롯 `listing_detail` 50 '위치': 카카오 주소 검색으로 주소를 고르면 지도(카카오 JS SDK)가 좌표로 바꿔 임시 핀을 보여 주고, [이 위치로 저장]을 눌러야 저장한다. 주소 바꾸기·위치 지우기 가능. [요청 + Claude 제안]
+- 주소 입력란은 메모와 분리했고(아래 나중 계획), 위치는 본인만 보며 AI 분석에 보내지 않는다는 안내를 섹션에 둔다. 공통 안내 문구(`core/ui.py`의 "실제 주소를 적지 마세요")는 메모에 대한 것이라 그대로 둔다. [Claude 제안]
+- API `GET·PUT·DELETE /listings/{listing_id}/location`, `GET /sessions/{session_id}/locations`, 테이블 `listing_locations`(`0131_listing_locations.sql`, 매물당 하나, 소유 사슬 RLS, 매물 삭제 시 CASCADE). [Claude 제안]
+- P1 파일 `frontend/features/sessions/sections.py`의 매물 목록만 두 칸(카드 3 : 지도 2)으로 나눴다(담당자 요청). [요청]
 
 ### 지금 있는 자리
 
