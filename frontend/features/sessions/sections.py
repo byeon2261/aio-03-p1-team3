@@ -1,10 +1,14 @@
 """F2·F3 상세 화면 섹션.
 
-- session_detail (order 10): 매물 목록(오른쪽에 F13 매물 지도), 새 메모 입력, 세션 제목·방문일 수정, 세션 삭제
+- session_detail (order 10): 매물 목록(사진이 있으면 카드에 대표 사진, 오른쪽에 F13 매물 지도), 새 메모 입력,
+  세션 제목·방문일 수정, 세션 삭제
 - listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
 """
 
 from __future__ import annotations
+
+import html
+import logging
 
 import streamlit as st
 
@@ -29,10 +33,49 @@ def _preview(text: str, n: int = 60) -> str:
     return one_line if len(one_line) <= n else one_line[:n] + "…"
 
 
+logger = logging.getLogger("frontend.sessions")
+
+
 # ------------------------------------------------------------------ session_detail
-def _listing_card(lst: dict) -> None:
+def _session_photos(session_id: str) -> dict[str, list[dict]]:
+    """이 세션 매물의 사진 {listing_id: [사진, …]}(올린 순). GET /me/photos(P4) 한 번으로 모은다.
+
+    사진을 못 불러와도 매물 목록은 그대로 보여야 하므로 실패하면 빈 dict(사진 없이 표시).
+    """
+    try:
+        photos = api_get("/me/photos") or []
+    except ApiError as e:
+        logger.warning("session photos unavailable: %s", e.code)
+        return {}
+    by_listing: dict[str, list[dict]] = {}
+    for photo in reversed(photos):          # 응답은 최신순 → 올린 순으로
+        if str(photo.get("session_id")) == str(session_id) and photo.get("url"):
+            by_listing.setdefault(str(photo["listing_id"]), []).append(photo)
+    return by_listing
+
+
+def _thumbnail(photos: list[dict], label: str) -> None:
+    """대표 사진(처음 올린 사진) 한 장. 여러 장이면 오른쪽 아래에 '+N'."""
+    url = html.escape(photos[0]["url"], quote=True)
+    more = (f'<span style="position:absolute;right:6px;bottom:6px;padding:1px 7px;border-radius:999px;'
+            f'background:rgba(15,23,42,.72);color:#fff;font-size:12px;font-weight:600">+{len(photos) - 1}</span>'
+            if len(photos) > 1 else "")
+    st.markdown(
+        f'<div style="position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;'
+        f'background:#f1f5f9"><img src="{url}" alt="{html.escape(label)} 사진" loading="lazy" '
+        f'style="width:100%;height:100%;object-fit:cover;display:block">{more}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _listing_card(lst: dict, photos: list[dict] | None = None) -> None:
     with st.container(border=True):
-        left, right = st.columns([4, 1], vertical_alignment="center")
+        if photos:
+            thumb, left, right = st.columns([1.3, 3, 1], vertical_alignment="center")
+            with thumb:
+                _thumbnail(photos, lst["label"])
+        else:
+            left, right = st.columns([4, 1], vertical_alignment="center")
         with left:
             st.markdown(f"**{lst['label']}** · {status_text(lst)}")
             st.caption(_preview(lst.get("memo_text", "")))
@@ -58,10 +101,11 @@ def _render_listings(session: dict) -> None:
     if not listings:
         st.info("아직 매물이 없습니다. 아래 '새 메모'에 첫 집 메모를 적고 저장하세요.")
         return
+    photos = _session_photos(sid)
     cards, map_area = st.columns([3, 2])
     with cards:
         for lst in listings:
-            _listing_card(lst)
+            _listing_card(lst, photos.get(str(lst["id"])))
         if len(listings) == 1:
             st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
     with map_area:

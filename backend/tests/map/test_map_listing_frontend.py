@@ -60,6 +60,7 @@ def fake():
     mod.calls, mod.errors, mod.api_key = [], set(), ""
     mod.responses = {
         f"/sessions/{SID}/listings": LISTINGS,
+        "/me/photos": [],
         f"/sessions/{SID}/locations": [{"listing_id": LID1, "listing_no": 1, "label": "1번 집", "location": LOC}],
         f"/listings/{LID1}/location": {"listing_id": LID1, "location": LOC},
         f"/listings/{LID2}/location": {"listing_id": LID2, "location": None},
