@@ -28,7 +28,6 @@ def _clicked_key(sid: str) -> str:
 
 def render_session_map(session: dict, listings: list[dict]) -> None:
     sid = session["id"]
-    st.markdown("**매물 지도**")
     try:
         pins = api_get(f"/sessions/{sid}/locations")
     except ApiError as e:

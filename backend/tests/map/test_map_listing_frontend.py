@@ -111,7 +111,8 @@ def test_listing_location_section_registered():
 def test_session_listings_with_map_column(fake):
     at = _app(SESSION_BODY)
     text = _text(at)
-    assert "1번 집" in text and "2번 집" in text and "매물 지도" in text
+    assert "1번 집" in text and "2번 집" in text
+    assert "매물 지도" not in text                          # 지도 위 제목은 두지 않는다
     assert ("GET", f"/sessions/{SID}/locations") in fake.calls
     assert "위치가 없는 매물 1곳은 지도에 없습니다." in text
     assert "카카오 JavaScript 키가 없어" in text            # 키가 없으면 지도 대신 안내
