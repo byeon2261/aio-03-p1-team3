@@ -62,22 +62,22 @@
 - 배포: 서버 Render(`https://house-tour-notes-api.onrender.com`), 화면 Streamlit Community Cloud(`https://aio-03-p1-team3-xqmxzsnatycg7fxy9agfvg.streamlit.app/`). 무료 서버는 잠들어 있으면 첫 요청이 최대 1분 걸린다.
 - 화면: 세션 목록 → 세션 상세(메모 입력·매물 지도·예산·항목 가중치·비교표·적합도 순위) → 매물 상세(분석 결과·수정·평가·사진·항목 만족도·위치) → 마이페이지(내 정보·내 사진·요약·가중치 프로필·내 발품 후기) / 발품 후기 쓰기·목록 / 전체 매물(지도) / 운영자 전용: 운영 대시보드(실시간 로그·지표·피드백 목록), 개선 전후 비교.
 
-## 3. 현재 상태 (2026-10-17 기준)
+## 3. 현재 상태 (2026-10-18 기준)
 
 ### 완료
 
 - 기능 F1~F11 구현과 통합: F1 인증, F2 세션·매물, F3 초안, F4 AI 분석, F5 재분석, F6 비교표, F7 수정·피드백, F8 운영 로그 대시보드(SSE 실시간 전달·재연결·놓친 로그 재조회·지표), F9 평가(개선 전후 비교), F10 사진·마이페이지, F11 예산(예산 필터로 숨긴 매물의 사유별 개수·다음 행동 안내, #23), F12 항목 가중치화(매물 항목별 만족도 × 계절별 가중치 프로필 → 적합도 0~100점·순위, #14), F14 발품 후기(지번 주소별 후기 쓰기·목록·검색, 사진 1장, 마이페이지 '내 발품 후기' 탭, #21), F13 일부: 내 매물 위치(매물 상세 '위치'), 세션 상세 매물 목록 옆 매물 지도, 사이드바 '전체 매물'(내 모든 매물 지도, 옛 demo_st 지도를 바꿈).
-- 테스트: `check_merge.py check` 통과, pytest 554개 통과(Python 3.12, 외부 서비스 없이, F12·F13·F14 포함).
+- 테스트: `check_merge.py check` 통과, pytest 555개 통과·1개 건너뜀(Python 3.12, 외부 서비스 없이, F12·F13·F14와 API 설계 문서 일치 검사 포함).
 - 배포: Render·Streamlit 배포 완료, 팀 확인 결과 주요 흐름 동작.
 - 개선 전후 비교 실행 2회(같은 20개 평가 사례, 같은 모델·설정):
   - v1: 필드 정확도 95.0%, 빠진 항목 정확도 80.0%, 실패 유형 NUM 3·CHK 4
   - v2: 필드 정확도 95.6%, 빠진 항목 정확도 75.0%, 실패 유형 NUM 2·CHK 5
   - 숫자 오류는 줄었지만 체크리스트 판정은 나빠졌다. 발표에서는 그대로 보여 주고 이유를 설명한다.
-- 문서: `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
+- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
 
 ### 아직 없는 것
 
-- 필수 설계 문서 3종(API·화면·DB). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 API·화면·테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
+- 필수 설계 문서 중 화면·DB 2종(API 설계 문서는 `docs/API_DESIGN.md`로 작성, #3). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 화면·테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
 - 발표 PPT.
 - 실제 사용자 피드백(팀원·수강생 평가) 수집, 피드백 → 개선 기록 문서.
 - GitHub Issue·PR 기반 협업 기록(이제부터 이 방식으로 남긴다).
@@ -93,7 +93,7 @@
 
 | # | 작업 | 산출물 | 완료 기준 | 마감 |
 |---|---|---|---|---|
-| 1 | API 설계 문서 | `docs/API_DESIGN.md` | 1절 API 요구사항 전부, 실제 코드(`backend/app/features/*/router.py`, `core/schemas.py`, `core/errors.py`)와 일치 | 10/20 |
+| 1 | API 설계 문서 | `docs/API_DESIGN.md` | 1절 API 요구사항 전부, 실제 코드(`backend/app/features/*/router.py`, `core/schemas.py`, `core/errors.py`)와 일치 | 10/20 · 완료(#3) |
 | 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 |
 | 3 | DB 설계서 | `docs/DB_DESIGN.md` | 1절 DB 요구사항 전부, `supabase/migrations/*`와 일치 | 10/20 |
 | 3+ | (선택) DB 컬럼 코멘트 마이그레이션 | `supabase/migrations/0009_comments.sql` | 실제 DB에 코멘트 반영 | 10/20 |
