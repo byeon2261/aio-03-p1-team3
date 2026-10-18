@@ -73,11 +73,11 @@
   - v1: 필드 정확도 95.0%, 빠진 항목 정확도 80.0%, 실패 유형 NUM 3·CHK 4
   - v2: 필드 정확도 95.6%, 빠진 항목 정확도 75.0%, 실패 유형 NUM 2·CHK 5
   - 숫자 오류는 줄었지만 체크리스트 판정은 나빠졌다. 발표에서는 그대로 보여 주고 이유를 설명한다.
-- 문서: `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
+- 문서: `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`, `SCREEN_DESIGN.md`(화면 설계서, F12·F13·F14 포함).
 
 ### 아직 없는 것
 
-- 필수 설계 문서 3종(API·화면·DB). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 API·화면·테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
+- 필수 설계 문서 중 API·DB 설계서(화면 설계서는 `SCREEN_DESIGN.md`로 추가). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 API·화면·테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
 - 발표 PPT.
 - 실제 사용자 피드백(팀원·수강생 평가) 수집, 피드백 → 개선 기록 문서.
 - GitHub Issue·PR 기반 협업 기록(이제부터 이 방식으로 남긴다).
