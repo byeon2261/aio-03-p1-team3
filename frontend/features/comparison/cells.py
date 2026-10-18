@@ -129,7 +129,7 @@ def comparison_markdown(data: dict) -> str:
 
 def hidden_message(data: dict) -> str | None:
     n = int((data.get("hidden_count") or {}).get(BUDGET_FILTER) or 0)
-    return f"판단 불가·초과 {n}건 숨김" if n > 0 else None
+    return f"{n}건 숨김 · 사유는 위 '예산' 섹션에서 확인" if n > 0 else None
 
 
 # ------------------------------------------------------------------ 수정·피드백

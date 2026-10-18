@@ -4,6 +4,7 @@
 > I2(계약 변경)에서 고침: feedback `action` 열(0008)로 '수정 취소(revert)'와 '메모에 없음(set + null)' 구분(2·3·5절, repo·FeedbackIn/Out·P3 본문·P6 필드 수정 비율 최종 상태 기준), 삭제 전 이벤트 payload에 `storage` 추가(2절 events).
 > F12(#14)에서 더함: 항목 가중치화 — 3절 상속 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 슬롯·열 key.
 > F14(#21)에서 더함: 발품 후기 — 3절 모델, 4절 엔드포인트, 5절 오류 코드·테이블, 6절 페이지·마이페이지 탭.
+> F11(#23)에서 더함: 예산 판정 상세 — 3절 모델, 4절 엔드포인트와 요청·응답 예시(판정 규칙·DB는 그대로).
 
 R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/conftest.py`·`fakes.py`, `frontend/app.py`, `frontend/core/*`, `supabase/migrations/*`)은 고치지 않는다. 바꿀 것이 있으면 REPORT "계약 변경 요청"에 적고 계약 안에서 우회한다.
 
@@ -64,6 +65,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - P7 `features/evals/schemas.py`: `EvalRunSummaryOut`(EvalRunOut + failure_counts, result_count, error_case_count), `EvalResultDetailOut`(EvalResultOut + case_id, memo_text, criteria, expected_json, mixed_listings_match, compare_output_json, compare_mixed_listings_match), `EvalCompareOut`(EvalResultsOut + condition_mismatches, run·compare_run은 EvalRunSummaryOut, results는 EvalResultDetailOut)
 - F12 `features/scoring/schemas.py`(계약 모델을 상속하지 않는 새 모델): `WeightProfileIn{name(1~30, 앞뒤 공백 제거), weights: [WeightItemIn{item_key, weight(0~100)}]}`(빠진 항목은 0), `WeightProfileOut{id, name, weights: [WeightItemOut] (SCORE_ITEMS 전체·순서), created_at, updated_at}`, `SatisfactionIn{items: [SatisfactionItemIn{item_key, satisfaction(0~100)}]}`(빠진 항목 = 미입력, 통째로 바꿈), `SatisfactionOut{listing_id, items: [SatisfactionItemOut{item_key, satisfaction|null}], entered_count, updated_at}`, `ScoringSettingIn{enabled, weight_profile_id|null}`, `ScoringSettingOut{session_id, enabled(기본 true), weight_profile_id, weight_profile_name, updated_at, items}`, `ScoresOut{session_id, setting: ScoringSettingOut, items, rows: [ScoreRow{listing_id, listing_no, label, score|null, rank|null, entered_count, total_items}], hidden_count}`. item_key는 `features/scoring/items.py`의 `SCORE_ITEMS`(기본 = CHECKLIST) 중 하나, 아니거나 중복이면 422
 - F14 `features/community/schemas.py`(새 모델): `PostIn{address(1~200), topic, title(1~100), body(1~3000), floor|null(-10~200, 0 제외), visit_date|null}`(글자는 앞뒤 공백 제거, 제목·본문에 전화번호·이메일 모양이 있으면 422 reason `contact_info`), `PostUpdateIn`(보낸 칸만 바꿈, 필수 칸은 null 불가), `PostSummaryOut{id, address, floor, topic, visit_date, title, nickname, is_mine, has_photo, created_at, updated_at}`, `PostOut`(PostSummaryOut + body, photo: `PostPhotoOut{id, content_type, size_bytes, url, url_expires_at}`|null), `TopicsOut{topics}`. topic은 `구조·설비`·`소음`·`채광`·`주변 환경`·`기타`. 작성자 id·이메일은 응답에 넣지 않는다
+- F11 `features/budget/schemas.py`(새 모델): `BudgetEvaluationsOut{session_id, budget_set, counts: BudgetCountsOut{within, over, unknown}, items: [BudgetEvaluationOut{listing_id, listing_no, label, status(within|over|unknown|null), status_label, reason, missing: list[str], next_action|null}]}`. status·reason은 `service.evaluate` 그대로(비교표 `budget` 열·`within_budget` 필터와 같은 판정), `missing`·`next_action`은 unknown일 때만 채우는 안내용
 
 ## 4. 엔드포인트
 | 담당 | 메서드 경로 | 요청 → 응답 |
@@ -86,6 +88,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | P4 | PATCH /me · POST /me/password | MeUpdateIn → ProfileOut · PasswordChangeIn → OkOut |
 | P4 | GET /me/photos · /me/summary | list[MyPhotoOut] · MySummaryOut |
 | P5 | GET·PUT /sessions/{session_id}/budget | BudgetOut(미설정이면 값 null) · BudgetIn → BudgetOut |
+| P5 | GET /sessions/{session_id}/budget/evaluations | BudgetEvaluationsOut(매물별 판정·사유·다음 행동, listing_no 순. 예시는 4절 끝) |
 | P6 | GET /admin/logs · /admin/logs/stream | list[RequestLogOut](기본 최신순 id 내림차순, `after_id`가 있으면 id 오름차순. `limit` 기본 100·최대 500. `include_admin` 기본 false면 `/admin` 요청 제외. 그 밖 `from`·`to`·`status`·`prompt_version`) · SSE(event `log`, id=로그 id, Last-Event-ID 뒤 DB 로그 먼저) |
 | P6 | GET /admin/metrics · /admin/feedback | MetricsOut(기본 최근 24시간, 사유별 개수는 `extra.feedback_reason_counts`) · list[FeedbackCaseOut](`rating` 기본 down, `limit` 기본 20·최대 100, 분석별 최신 평가만) |
 | P7 | GET·POST /admin/eval-runs | list[EvalRunSummaryOut] · EvalRunCreateIn → EvalRunSummaryOut('running', 실행은 백그라운드) |
@@ -101,6 +104,59 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | F14 | GET·PATCH·DELETE /community/posts/{post_id} | PostOut(로그인 사용자 모두) · PostUpdateIn → PostOut(작성자만) · OkOut(작성자만, 사진 파일 먼저 삭제) |
 | F14 | POST·DELETE /community/posts/{post_id}/photo | multipart `file`(JPG·PNG, 5MB, 글당 1장, 있으면 바꿈) → PostOut · PostOut(작성자만) |
 /admin/*는 `require_admin`.
+
+### P5 `GET /sessions/{session_id}/budget/evaluations` 예시
+
+'예산 안만 보기'로 숨긴 매물의 사유와 다음 행동을 보여 줄 때 쓴다. 판정 결과·규칙은 바꾸지 않고, 미기재를 0원·추정값으로 채우지 않는다.
+
+- 요청: 본문·쿼리 없음, `Authorization: Bearer <access_token>`. 본인 세션만.
+- 응답 200 `BudgetEvaluationsOut` — 예산(보증금 상한 1000, 월 고정비 상한 55)에 매물 5개: 예산 안 1, 판단 불가 2(관리비 미기재·분석 전), 예산 초과 2.
+
+```http
+GET /sessions/6f1c2a3e-0000-4000-8000-000000000001/budget/evaluations
+```
+
+```json
+{
+  "session_id": "6f1c2a3e-0000-4000-8000-000000000001",
+  "budget_set": true,
+  "counts": {"within": 1, "over": 2, "unknown": 2},
+  "items": [
+    {"listing_id": "a1000000-0000-4000-8000-000000000001", "listing_no": 1, "label": "1번 집",
+     "status": "within", "status_label": "예산 안", "reason": "예산 안", "missing": [], "next_action": null},
+    {"listing_id": "a1000000-0000-4000-8000-000000000002", "listing_no": 2, "label": "2번 집",
+     "status": "unknown", "status_label": "판단 불가", "reason": "관리비 미기재", "missing": ["관리비"],
+     "next_action": "관리비 17만원 이하면 예산 안"},
+    {"listing_id": "a1000000-0000-4000-8000-000000000003", "listing_no": 3, "label": "3번 집",
+     "status": "unknown", "status_label": "판단 불가", "reason": "분석 결과 없음", "missing": [],
+     "next_action": "AI 정리를 실행하세요"},
+    {"listing_id": "a1000000-0000-4000-8000-000000000004", "listing_no": 4, "label": "4번 집",
+     "status": "over", "status_label": "예산 초과", "reason": "보증금 초과", "missing": [], "next_action": null},
+    {"listing_id": "a1000000-0000-4000-8000-000000000005", "listing_no": 5, "label": "5번 집",
+     "status": "over", "status_label": "예산 초과", "reason": "월 고정비 초과", "missing": [], "next_action": null}
+  ]
+}
+```
+
+2번 집: 월세 38 + 관리비 미기재 → 관리비를 0원으로 더하지 않아 `unknown`. 다음 행동의 17 = 월 고정비 상한 55 − 월세 38.
+
+`next_action` 규칙(unknown일 때만, 그 밖에는 null):
+
+| 경우 | next_action |
+|---|---|
+| 분석 결과 없음 | `AI 정리를 실행하세요` |
+| 관리비만 미기재, 월세 < 월 고정비 상한 | `관리비 n만원 이하면 예산 안` (n = 상한 − 월세) |
+| 관리비만 미기재, 월세 = 상한 | `관리비가 없어야 예산 안` |
+| 보증금 미기재(보증금 상한이 있을 때만) | `보증금을 확인하세요` |
+| 월세 미기재(월 고정비 상한이 있을 때만) | `월세를 확인하세요`, 관리비도 미기재면 `월세·관리비를 확인하세요` |
+| 여러 값 미기재 | ` · `로 이음. 관리비는 `관리비는 n만원 이하여야 합니다`(월세 = 상한이면 `관리비가 없어야 합니다`) — 예: `보증금을 확인하세요 · 관리비는 17만원 이하여야 합니다` |
+
+- 예산 미설정: `budget_set` false, `counts` 모두 0, 각 item `status` null·`status_label` "-"·`reason` "예산 미설정".
+- 오류: 다른 사람·없는 세션 404, 로그인 없음 401.
+
+```json
+{"error": {"code": "SESSION_NOT_FOUND", "message": "세션을 찾을 수 없습니다.", "detail": {"request_id": "…"}}}
+```
 
 ## 5. 오류 코드·테이블
 오류: AUTH_REQUIRED·INVALID_CREDENTIALS 401, EMAIL_NOT_CONFIRMED·FORBIDDEN 403, SESSION/LISTING/ANALYSIS/PHOTO/DRAFT_NOT_FOUND 404, DRAFT_EXPIRED 410, VALIDATION_ERROR 422(detail.fields: loc·type·msg만), AI_RATE_LIMITED 429, INTERNAL_ERROR 500, AI_FORMAT_ERROR 502, CONFIG_MISSING·KV_UNAVAILABLE·CLEANUP_FAILED 503, AI_TIMEOUT 504.

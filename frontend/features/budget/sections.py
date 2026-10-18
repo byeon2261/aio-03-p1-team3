@@ -3,6 +3,8 @@
 - 보증금 상한·월 고정비 상한(만원) 입력, 저장, 비우기.
 - "예산 안만 보기" 토글 → st.session_state[budget_filter_key(sid)]에 쓴다. 비교표(P3, order 30)가 읽는다.
 - 상한이 없으면 토글을 끄고 "예산을 먼저 입력하세요"를 보여 준다.
+- 토글이 켜져 있으면 숨긴 매물을 사유별로 세어 보여 주고(예산 초과 n건 · 판단 불가 n건 숨김),
+  그 아래 판단 불가 매물마다 사유·다음 행동·[열기]를 한 줄씩 보여 준다(GET /sessions/{sid}/budget/evaluations).
 import 시 st 함수를 부르지 않는다.
 """
 
@@ -10,10 +12,13 @@ from __future__ import annotations
 
 import streamlit as st
 
+from core import nav
 from core.api import ApiError, api_get, api_put
 from core.state import budget_filter_key
 from core.ui import fmt_kst, show_api_error
-from features.budget.view import budget_body, budget_summary, has_budget
+from features.budget.view import (
+    budget_body, budget_summary, has_budget, hidden_summary, unknown_items, unknown_line,
+)
 
 
 def _cache_key(sid: str) -> str:
@@ -88,6 +93,28 @@ def _render_toggle(sid: str, budget: dict) -> None:
     st.session_state[key] = on
     if on:
         st.caption("비교표에 예산 안 매물만 보여 줍니다. 숨긴 매물을 보려면 토글을 끄세요.")
+        _render_hidden(sid)
+
+
+def _render_hidden(sid: str) -> None:
+    """숨긴 매물 사유별 개수 + 판단 불가 매물의 다음 행동. 판정은 서버 결과 그대로 보여 준다."""
+    try:
+        with st.spinner("숨긴 매물을 확인하는 중…"):
+            data = api_get(f"/sessions/{sid}/budget/evaluations")
+    except ApiError as e:
+        show_api_error(e)
+        if st.button("다시 시도", key=f"budget_eval_retry:{sid}"):
+            st.rerun()
+        return
+    summary = hidden_summary(data)
+    if not summary:
+        return
+    st.markdown(f"예산 필터 적용 중 · **{summary}**")
+    for item in unknown_items(data):
+        c1, c2 = st.columns([5, 1], vertical_alignment="center")
+        c1.markdown(unknown_line(item))
+        if c2.button("열기", key=f"budget_open:{item['listing_id']}", width="stretch"):
+            nav.go_listing_detail(item["listing_id"])
 
 
 def render_budget(ctx: dict) -> None:
