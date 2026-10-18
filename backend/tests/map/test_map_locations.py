@@ -142,6 +142,12 @@ def test_my_locations_across_sessions(client_as, make_user, memory_db, owner):
     assert sat["session_id"] == session["id"] and sat["listing_id"] == first["id"]
     assert (sat["deposit_manwon"], sat["monthly_rent_manwon"], sat["analyzed"]) == (1000, 40, True)
     assert pins[("일요일 집 보기", "1번 집")]["analyzed"] is False
+    assert sat["memo_text"] == first["memo_text"] and sat["analysis_status"] == "success"
+    assert sat["needs_reanalysis"] is False
+    assert pins[("일요일 집 보기", "1번 집")]["analysis_status"] == "none"
+    c.patch(f"/listings/{first['id']}", json={"memo_text": "메모를 고쳤다"})
+    again = next(p for p in c.get("/me/locations").json()["pins"] if p["listing_id"] == first["id"])
+    assert again["needs_reanalysis"] is True and again["memo_text"] == "메모를 고쳤다"
 
     # 남의 매물은 보이지 않는다
     other = client_as(make_user())

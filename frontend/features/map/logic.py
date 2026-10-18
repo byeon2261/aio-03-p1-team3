@@ -108,10 +108,49 @@ def my_pins(pins: list[dict]) -> list[dict]:
     return out
 
 
-def panel_text(pin_count: int, listing_count: int) -> dict:
-    """전체 매물 지도 왼쪽 위 요약."""
-    missing = max(listing_count - pin_count, 0)
-    subtitle = f"위치를 넣은 매물 {pin_count}곳"
+# 세션 상세 매물 카드(features/sessions/common.py)와 같은 상태 문구
+STATUS_TEXT = {"none": ("분석 전", "none"), "success": ("분석 완료", "success"), "failed": ("분석 실패", "failed")}
+STATUS_HINT = {"none": "매물 화면에서 분석을 실행하세요.", "failed": "매물 화면에서 다시 시도하세요."}
+STALE_HINT = "메모가 분석 뒤에 바뀌었습니다. 분석을 다시 실행하세요."
+
+
+def memo_preview(text: str | None, n: int = 60) -> str:
+    one_line = " ".join((text or "").split())
+    return one_line if len(one_line) <= n else one_line[:n] + "…"
+
+
+def first_photos(photos: list[dict]) -> dict[str, str]:
+    """GET /me/photos(최신순) → {listing_id: 처음 올린 사진 URL}."""
+    out: dict[str, str] = {}
+    for photo in reversed(photos or []):
+        if photo.get("url"):
+            out.setdefault(str(photo["listing_id"]), photo["url"])
+    return out
+
+
+def list_item(pin: dict, thumb: str | None = None) -> dict:
+    """전체 매물 목록 한 줄: 세션 상세 매물 카드처럼 이름·분석 상태·메모, 여기에 세션·금액을 더한다."""
+    status = pin.get("analysis_status") or "none"
+    text, tone = STATUS_TEXT.get(status, STATUS_TEXT["none"])
+    hint = STATUS_HINT.get(status, "")
+    if pin.get("needs_reanalysis"):
+        text, tone, hint = f"{text} · 재분석 필요", "stale", STALE_HINT
+    meta = [pin.get("session_title") or ""]
+    if pin.get("analyzed"):   # 목록 줄에는 적혀 있는 금액만(미기재는 카드에서 보인다)
+        for name, key in (("보증금", "deposit_manwon"), ("월세", "monthly_rent_manwon")):
+            if pin.get(key) is not None:
+                meta.append(f"{name} {manwon_text(pin[key])}")
+    return {"id": pin["listing_id"], "label": pin["label"], "status": text, "tone": tone,
+            "meta": " · ".join(m for m in meta if m), "memo": memo_preview(pin.get("memo_text")),
+            "hint": hint, "thumb": thumb}
+
+
+def panel_text(pins: list[dict], listing_count: int, photos: dict[str, str] | None = None) -> dict:
+    """전체 매물 지도 왼쪽 위 패널: 요약 + 매물 목록(누르면 지도가 그 매물로 이동)."""
+    missing = max(listing_count - len(pins), 0)
+    subtitle = f"위치를 넣은 매물 {len(pins)}곳"
     if missing:
         subtitle += f" · 위치 없는 매물 {missing}곳"
-    return {"title": "전체 매물", "subtitle": subtitle}
+    photos = photos or {}
+    return {"title": "전체 매물", "subtitle": subtitle,
+            "items": [list_item(p, photos.get(p["listing_id"])) for p in pins]}

@@ -105,7 +105,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 | F14 | POST·DELETE /community/posts/{post_id}/photo | multipart `file`(JPG·PNG, 5MB, 글당 1장, 있으면 바꿈) → PostOut · PostOut(작성자만) |
 | F13 | GET /map/listings?latitude=&longitude=&radius_m= | MapSearchOut(로그인 사용자 모두, 반경 300·500·1000만, 그 밖은 422 reason `radius_m`, 위도 33~39·경도 124~132, 직선거리 가까운 순) |
 | F13 | GET·PUT·DELETE /listings/{listing_id}/location | ListingLocationOut(없으면 location null) · LocationIn → ListingLocationOut(있으면 통째로 바꿈) · OkOut(없어도 성공). 남의 매물은 404 LISTING_NOT_FOUND |
-| F13 | GET /me/locations | MyPinsOut{pins: [MyPinOut](SessionPinOut + session_id, session_title, 세션 최신순 → 매물 번호 순), listing_count(위치 없는 매물 포함)} |
+| F13 | GET /me/locations | MyPinsOut{pins: [MyPinOut](SessionPinOut + session_id, session_title, memo_text, analysis_status, needs_reanalysis, 세션 최신순 → 매물 번호 순), listing_count(위치 없는 매물 포함)} |
 | F13 | GET /sessions/{session_id}/locations | list[SessionPinOut](위치가 있는 매물만, listing_no 순). 남의 세션은 404 SESSION_NOT_FOUND |
 /admin/*는 `require_admin`.
 
@@ -136,7 +136,7 @@ CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블
 - `nav.py`: `go_sessions()`, `go_session_detail(sid)`, `go_listing_detail(lid)`, `go_page(key)`. on_click 콜백이 아닌 본문(`if st.button(...)`)에서 부른다.
 - `slots.py`: `render_slot(slot, ctx)`. `ui.py`: `fmt_manwon(v)`("미기재"/"500만원"), `fmt_kst(t)`, `show_api_error(e)`(코드별 문구+다음 할 일), `privacy_notice()`.
 - 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10(사진이 있는 매물 카드에 처음 올린 사진·+N, `GET /me/photos` 한 번으로 이 세션 것만 고름, 실패하면 사진 없이 표시. 매물 카드 오른쪽에 F13 `features.map.listing_map.render_session_map()` 매물 지도), P5 예산 20, F12 항목 가중치 25, P3 비교표 30, F12 적합도 순위 35. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40, F12 항목 만족도 45, F13 위치 50.
-- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, F14 발품 후기 쓰기 60 `balpum_write`, F14 발품 후기 목록 65 `balpum_list`, F13 전체 매물 70 `map`(내 모든 세션의 위치 있는 매물을 사이드바 오른쪽 전체 지도에 핀으로, 핀 카드에서 매물 상세로 이동. 카카오 JavaScript 키: secrets·환경변수·`frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면 입력), P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필·내 발품 후기, 가중치 프로필 탭은 F12 `features.scoring.sections.render_profile_manager()`, 마지막 탭은 F14 `features.community.mypage_tab.render_my_posts()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
+- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, F14 발품 후기 쓰기 60 `balpum_write`, F14 발품 후기 목록 65 `balpum_list`, F13 전체 매물 70 `map`(내 모든 세션의 위치 있는 매물을 사이드바 오른쪽 전체 지도에 핀으로, 왼쪽 위 매물 목록을 누르면 그 핀으로 이동, 핀 카드에서 매물 상세로 이동. 카카오 JavaScript 키: secrets·환경변수·`frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면 입력), P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필·내 발품 후기, 가중치 프로필 탭은 F12 `features.scoring.sections.render_profile_manager()`, 마지막 탭은 F14 `features.community.mypage_tab.render_my_posts()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
 - 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용), 비교표 열 key `score`(F12, order 20). F12 순위 섹션은 `budget_filter_key(sid)`를 읽어 같은 필터로 `/scores`를 부른다.
 
 ## 7. 테스트

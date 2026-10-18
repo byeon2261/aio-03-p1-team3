@@ -132,7 +132,8 @@ export default function(component) {
   if (!state) {
     state = {
       map: null, started: false, disposed: false, markers: [], overlays: [], listeners: [],
-      card: null, temp: null, lastPins: "", lastGeocode: null,
+      card: null, temp: null, lastPins: "", lastGeocode: null, pinIndex: {}, activeId: null,
+      panelOpen: true, lastPanel: "",
     };
     parentElement.__mapPins = state;
   }
@@ -149,6 +150,24 @@ export default function(component) {
   function closeCard() {
     state.card?.setMap(null);
     state.card = null;
+    setActive(null);
+  }
+
+  function setActive(id) {
+    state.activeId = id;
+    for (const item of parentElement.querySelectorAll(".map-list-item")) {
+      const on = item.dataset.id === id;
+      item.classList.toggle("is-active", on);
+      item.setAttribute("aria-current", on ? "true" : "false");
+      if (on) item.scrollIntoView({block: "nearest", behavior: "smooth"});
+    }
+  }
+
+  function focusPin(id) {
+    const entry = state.pinIndex[id];
+    if (!entry || !state.map) return;
+    if (state.map.getLevel() > 4) state.map.setLevel(4);
+    openCard(entry.pin, entry.position);
   }
 
   function buildCard(pin) {
@@ -234,6 +253,7 @@ export default function(component) {
       position, content: wrapCard(buildCard(pin)), xAnchor: 0.5, yAnchor: 1, zIndex: 20, clickable: true,
     });
     state.card.setMap(state.map);
+    setActive(pin.id);
     // 카드가 지도 위쪽에 잘리지 않도록 핀을 지도 아래쪽(가운데에서 140px 아래)에 오게 옮긴다
     const projection = state.map.getProjection();
     const point = projection.containerPointFromCoords(position);
@@ -258,6 +278,7 @@ export default function(component) {
     if (serialized === state.lastPins) return;
     state.lastPins = serialized;
     clearPins();
+    state.pinIndex = {};
     const maps = window.kakao.maps;
     const bounds = new maps.LatLngBounds();
     for (const pin of pins) {
@@ -268,6 +289,7 @@ export default function(component) {
       label.className = "map-pins-label";
       label.textContent = pin.label;
       const overlay = new maps.CustomOverlay({position, content: label, yAnchor: 2.9, map: state.map, clickable: true});
+      state.pinIndex[pin.id] = {pin, position};
       const listener = () => openCard(pin, position);
       label.addEventListener("click", event => {
         event.stopPropagation();
@@ -329,19 +351,99 @@ export default function(component) {
     });
   }
 
+  function buildItem(item) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "map-list-item";
+    row.dataset.id = item.id;
+    if (item.thumb) {
+      const thumb = document.createElement("img");
+      thumb.className = "map-list-item__thumb";
+      thumb.src = item.thumb;
+      thumb.alt = "";
+      thumb.loading = "lazy";
+      row.append(thumb);
+    }
+    const body = document.createElement("span");
+    body.className = "map-list-item__body";
+    const head = document.createElement("span");
+    head.className = "map-list-item__head";
+    const label = document.createElement("strong");
+    label.textContent = item.label;
+    const status = document.createElement("span");
+    status.className = "map-list-item__status is-" + (item.tone || "none");
+    status.textContent = item.status;
+    head.append(label, status);
+    body.append(head);
+    for (const [text, cls] of [[item.meta, "map-list-item__meta"], [item.memo, "map-list-item__memo"],
+                               [item.hint, "map-list-item__hint"]]) {
+      if (!text) continue;
+      const line = document.createElement("span");
+      line.className = cls;
+      line.textContent = text;
+      body.append(line);
+    }
+    row.append(body);
+    row.addEventListener("click", event => {
+      event.stopPropagation();
+      focusPin(item.id);
+    });
+    return row;
+  }
+
   function syncPanel() {
     const panel = parentElement.querySelector(".map-pins-panel");
     const info = state.data.panel;
     panel.hidden = !info;
     if (!info) return;
+    const serialized = JSON.stringify(info);
+    if (serialized === state.lastPanel) return;
+    state.lastPanel = serialized;
     panel.replaceChildren();
+    if (!panel.__bound) {
+      panel.__bound = true;   // 지도 끌기·확대가 목록 스크롤을 가로채지 않게
+      for (const type of ["mousedown", "touchstart", "dblclick", "wheel"]) {
+        panel.addEventListener(type, event => event.stopPropagation());
+      }
+    }
+
+    const head = document.createElement("div");
+    head.className = "map-pins-panel__head";
+    const titles = document.createElement("div");
     const title = document.createElement("strong");
     title.textContent = info.title;
-    panel.append(title);
+    titles.append(title);
     if (info.subtitle) {
       const sub = document.createElement("span");
       sub.textContent = info.subtitle;
-      panel.append(sub);
+      titles.append(sub);
+    }
+    head.append(titles);
+    const items = info.items || [];
+    if (items.length) {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "map-pins-panel__toggle";
+      const list = document.createElement("div");
+      list.className = "map-list";
+      list.setAttribute("role", "list");
+      for (const item of items) list.append(buildItem(item));
+      const apply = () => {
+        list.hidden = !state.panelOpen;
+        toggle.textContent = state.panelOpen ? "접기" : "목록";
+        toggle.setAttribute("aria-expanded", String(state.panelOpen));
+      };
+      toggle.addEventListener("click", event => {
+        event.stopPropagation();
+        state.panelOpen = !state.panelOpen;
+        apply();
+      });
+      apply();
+      head.append(toggle);
+      panel.append(head, list);
+      setActive(state.activeId);
+    } else {
+      panel.append(head);
     }
   }
 
@@ -498,19 +600,94 @@ PINS_CSS = """
   top: 72px;
   left: 20px;
   z-index: 5;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.95);
+  width: 340px;
+  max-width: calc(100% - 40px);
+  max-height: calc(100% - 96px);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
   color: #0f172a;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
-  pointer-events: none;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
 }
 .map-pins-panel[hidden] { display: none; }
-.map-pins-panel strong { font-size: 16px; }
-.map-pins-panel span { font-size: 12px; color: #64748b; }
+.map-pins-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.map-pins-panel__head > div { display: flex; flex-direction: column; gap: 2px; }
+.map-pins-panel__head strong { font-size: 16px; }
+.map-pins-panel__head span { font-size: 12px; color: #64748b; }
+.map-pins-panel__toggle {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.map-pins-panel__toggle:hover { background: #f8fafc; }
+.map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+}
+.map-list[hidden] { display: none; }
+.map-list-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.map-list-item:hover { border-color: #93c5fd; }
+.map-list-item.is-active { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.15); }
+.map-list-item__thumb {
+  flex: none;
+  width: 68px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #f1f5f9;
+}
+.map-list-item__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.map-list-item__head { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.map-list-item__head strong { font-size: 14px; }
+.map-list-item__status { font-size: 12px; }
+.map-list-item__status.is-success { color: #15803d; }
+.map-list-item__status.is-none { color: #64748b; }
+.map-list-item__status.is-failed { color: #dc2626; }
+.map-list-item__status.is-stale { color: #c2410c; font-weight: 600; }
+.map-list-item__meta { font-size: 12px; color: #475569; }
+.map-list-item__memo {
+  display: -webkit-box;
+  font-size: 12px;
+  color: #64748b;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.map-list-item__hint { font-size: 11px; color: #94a3b8; }
 .map-pins-status { margin: 4px 0 0; font-size: 13px; opacity: 0.8; }
 .map-pins-status:empty { display: none; }
 .map-pins-status.is-floating {
@@ -571,7 +748,9 @@ def pins_map(api_key: str, pins: list[dict], *, key: str, geocode: dict | None =
     (돌려받은 값의 .geocoded = {id, ok, latitude, longitude, roadAddress, parcelAddress, zonecode, buildingName}).
     핀(또는 이름표)을 누르면 정보 카드가 열린다. 카드의 '매물 상세 보기'를 누르면 .open에 핀 id가 들어 있다.
     핀 항목: rows=[{label, value, muted}], note, link(True면 '매물 상세 보기').
-    fullscreen=True면 지도를 화면 높이(100vh)로 그리고, panel={title, subtitle}을 왼쪽 위에 띄운다.
+    fullscreen=True면 지도를 화면 높이(100vh)로 그리고, panel={title, subtitle, items}을 왼쪽 위에 띄운다.
+    items=[{id, label, status, tone(success·none·failed·stale), meta, memo, hint, thumb}]: 누르면 그 핀으로
+    지도가 옮겨 가고 정보 카드가 열린다. 핀을 누르면 목록의 같은 항목이 강조된다.
     """
     return _pins()(
         key=key,

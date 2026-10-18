@@ -18,7 +18,8 @@ LOC = {"road_address": "가상시 예시구 샘플로 1", "parcel_address": None
        "building_name": None, "latitude": 37.55, "longitude": 126.97, "updated_at": "2026-10-18T05:00:00Z"}
 PIN = {"listing_id": "l-1", "listing_no": 1, "label": "1번 집", "location": LOC, "session_id": "s-1",
        "session_title": "토요일 집 보기", "analyzed": True, "deposit_manwon": 1000, "monthly_rent_manwon": 40,
-       "maintenance_fee_manwon": None}
+       "maintenance_fee_manwon": None, "memo_text": "보증금 1000 월세 40  채광 좋음", "analysis_status": "success",
+       "needs_reanalysis": False}
 
 HEADER = f"""
 import sys
@@ -32,7 +33,7 @@ def _get(path, params=None, **kw):
     fake.calls.append(path)
     if fake.error:
         raise ApiError(503, "DB_UNAVAILABLE", "잠시 후 다시 시도해 주세요.")
-    return fake.response
+    return fake.photos if path == "/me/photos" else fake.response
 
 pages.api_get = _get
 components.logic.configured_api_key = lambda *a, **kw: fake.configured_key
@@ -47,6 +48,8 @@ def fake():
     mod = types.ModuleType("_map_all_fake")
     mod.calls, mod.error, mod.configured_key = [], False, "dummy-key"
     mod.response = {"pins": [PIN], "listing_count": 3}
+    mod.photos = [{"listing_id": "l-1", "url": "https://example.com/new.png"},
+                  {"listing_id": "l-1", "url": "https://example.com/first.png"}]
     sys.modules["_map_all_fake"] = mod
     yield mod
     sys.modules.pop("_map_all_fake", None)
@@ -81,8 +84,24 @@ def test_all_listings_logic():
     pin = logic.my_pins([PIN])[0]
     assert pin["detail"] == "토요일 집 보기 · 가상시 예시구 샘플로 1"
     assert pin["link"] is True and [r["value"] for r in pin["rows"]] == ["1,000만원", "40만원"]
-    assert logic.panel_text(2, 5) == {"title": "전체 매물", "subtitle": "위치를 넣은 매물 2곳 · 위치 없는 매물 3곳"}
-    assert logic.panel_text(2, 2)["subtitle"] == "위치를 넣은 매물 2곳"
+    panel = logic.panel_text([PIN, {**PIN, "listing_id": "l-2"}], 5, {"l-1": "https://example.com/a.png"})
+    assert panel["title"] == "전체 매물" and panel["subtitle"] == "위치를 넣은 매물 2곳 · 위치 없는 매물 3곳"
+    assert panel["items"][0] == {
+        "id": "l-1", "label": "1번 집", "status": "분석 완료", "tone": "success",
+        "meta": "토요일 집 보기 · 보증금 1,000만원 · 월세 40만원", "memo": "보증금 1000 월세 40 채광 좋음",
+        "hint": "", "thumb": "https://example.com/a.png"}
+    assert panel["items"][1]["thumb"] is None
+    assert logic.panel_text([PIN], 1)["subtitle"] == "위치를 넣은 매물 1곳"
+    none = logic.list_item({**PIN, "analysis_status": "none", "analyzed": False})
+    assert (none["status"], none["tone"], none["meta"]) == ("분석 전", "none", "토요일 집 보기")
+    assert none["hint"] == "매물 화면에서 분석을 실행하세요."
+    stale = logic.list_item({**PIN, "needs_reanalysis": True})
+    assert stale["status"] == "분석 완료 · 재분석 필요" and stale["tone"] == "stale"
+    jeonse = logic.list_item({**PIN, "deposit_manwon": 25000, "monthly_rent_manwon": None})
+    assert jeonse["meta"] == "토요일 집 보기 · 보증금 2억 5,000만원"
+    assert logic.memo_preview("가" * 70).endswith("…") and len(logic.memo_preview("가" * 70)) == 61
+    assert logic.first_photos([{"listing_id": "l-1", "url": "new"}, {"listing_id": "l-1", "url": "old"},
+                               {"listing_id": "l-2", "url": None}]) == {"l-1": "old"}
 
 
 def test_map_page_registered_as_all_listings():
@@ -95,7 +114,7 @@ def test_map_page_registered_as_all_listings():
 # ------------------------------------------------------------------ 화면
 def test_all_listings_shows_full_map(fake):
     at = _app()
-    assert fake.calls == ["/me/locations"]
+    assert fake.calls == ["/me/locations", "/me/photos"]
     md = "\n".join(str(m.value) for m in at.markdown)
     assert "max-width: 100% !important" in md               # 본문 여백을 없애 지도를 화면 전체에
     assert not at.title and not at.error                     # 지도만 보인다
@@ -122,3 +141,9 @@ def test_all_listings_api_error(fake):
     fake.error = True
     at = _app()
     assert at.error and any(b.label == "다시 시도" for b in at.button)
+
+
+def test_all_listings_photo_error_keeps_map(fake):
+    fake.photos = None   # /me/photos가 비어 와도
+    at = _app()
+    assert not at.error

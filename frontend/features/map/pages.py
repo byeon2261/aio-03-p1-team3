@@ -2,6 +2,7 @@
 
 내 모든 세션에서 위치를 넣은 매물을 사이드바를 뺀 화면 전체 지도에 핀으로 찍는다(GET /me/locations).
 핀을 누르면 정보 카드(N번 집·세션·주소·보증금·월세·관리비)가 열리고, [매물 상세 보기]는 그 매물 상세로 간다.
+왼쪽 위 패널에 매물 목록(세션 상세 매물 카드처럼 사진·이름·분석 상태·메모)을 두고, 누르면 지도가 그 매물로 옮겨 간다.
 카카오 JavaScript 키: st.secrets / 환경변수 / frontend/.env 의 KAKAO_JAVASCRIPT_KEY, 없으면 화면에서 입력.
 """
 
@@ -40,6 +41,14 @@ def _ask_key() -> str:
     return str(st.session_state.get(logic.KEY_INPUT) or "")
 
 
+def _photos() -> dict[str, str]:
+    """목록 썸네일: 매물별 처음 올린 사진. 못 불러와도 목록은 사진 없이 보인다."""
+    try:
+        return logic.first_photos(api_get("/me/photos") or [])
+    except ApiError:
+        return {}
+
+
 def render_all_listings() -> None:
     try:
         data = api_get("/me/locations")
@@ -68,7 +77,7 @@ def render_all_listings() -> None:
     st.markdown(FULL_BLEED_CSS, unsafe_allow_html=True)
     result = components.pins_map(
         api_key, logic.my_pins(pins), key="map_all_pins", fullscreen=True,
-        panel=logic.panel_text(len(pins), int(data.get("listing_count") or 0)),
+        panel=logic.panel_text(pins, int(data.get("listing_count") or 0), _photos()),
     )
     opened = getattr(result, "open", None)
     if opened and any(p["listing_id"] == opened for p in pins):

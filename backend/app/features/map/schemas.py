@@ -112,6 +112,9 @@ class MyPinOut(SessionPinOut):
 
     session_id: str
     session_title: str = Field(examples=["토요일 집 보기"])
+    memo_text: str = Field(default="", description="매물 메모(목록 미리보기용, 본인 것만)")
+    analysis_status: Literal["none", "success", "failed"] = Field(default="none", description="최신 분석 상태")
+    needs_reanalysis: bool = Field(default=False, description="분석 뒤 메모가 바뀌었는지")
 
 
 class MyPinsOut(BaseModel):

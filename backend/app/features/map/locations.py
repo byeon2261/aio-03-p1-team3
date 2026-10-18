@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
+from app.core.analysis_contract import needs_reanalysis
 from app.core.db import Database, UniqueViolation
 from app.core.repo import field_overrides, latest_analysis, list_listings
 from app.core.values import MONEY_FIELDS, effective_values
@@ -79,7 +80,10 @@ def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
 
 
 def my_pins(db: Database, profile_id: Any) -> MyPinsOut:
-    """내 모든 세션의 매물 중 위치가 있는 것. 세션 만든 순(최신 먼저) → 매물 번호 순."""
+    """내 모든 세션의 매물 중 위치가 있는 것. 세션 만든 순(최신 먼저) → 매물 번호 순.
+
+    지도 왼쪽 목록에 쓰도록 메모·분석 상태(세션 상세 매물 카드와 같은 정보)도 붙인다.
+    """
     sessions = db.select("tour_sessions", {"profile_id": str(profile_id)}, order_by="created_at", desc=True)
     if not sessions:
         return MyPinsOut(pins=[], listing_count=0)
@@ -96,8 +100,12 @@ def my_pins(db: Database, profile_id: Any) -> MyPinsOut:
         for listing in sorted(by_session.get(str(session["id"]), []), key=lambda x: int(x["listing_no"])):
             row = by_listing.get(str(listing["id"]))
             if row:
+                newest = latest_analysis(db, listing["id"], status=None)
                 pins.append(MyPinOut(listing_id=str(listing["id"]), listing_no=int(listing["listing_no"]),
                                      label=label_of(listing), location=LocationOut.model_validate(row),
                                      session_id=str(session["id"]), session_title=session.get("title") or "",
+                                     memo_text=listing.get("memo_text") or "",
+                                     analysis_status=(newest or {}).get("status") or "none",
+                                     needs_reanalysis=needs_reanalysis(listing, newest),
                                      **money_of(db, listing["id"])))
     return MyPinsOut(pins=pins, listing_count=len(listings))
