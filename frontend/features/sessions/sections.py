@@ -1,6 +1,7 @@
 """F2·F3 상세 화면 섹션.
 
-- session_detail (order 10): 매물 목록(사진이 있으면 카드에 대표 사진, 오른쪽에 F13 매물 지도), 새 메모 입력,
+- session_detail (order 10): 매물 목록(제목 옆 [AI 정리]로 정리 안 된 매물 한 번에 분석, 사진이 있으면 카드에
+  대표 사진, 오른쪽에 F13 매물 지도), 새 메모 입력,
   세션 제목·방문일 수정, 세션 삭제
 - listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
 """
@@ -15,6 +16,7 @@ import streamlit as st
 from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
+from features.sessions import analyze_all
 from features.sessions.common import flash, parse_date, show_flash, status_next_step, status_text
 from features.sessions.memo_editor import render_memo_editor
 from features.map.listing_map import render_session_map
@@ -79,7 +81,7 @@ def _listing_card(lst: dict, photos: list[dict] | None = None) -> None:
         with left:
             st.markdown(f"**{lst['label']}** · {status_text(lst)}")
             st.caption(_preview(lst.get("memo_text", "")))
-            hint = status_next_step(lst)
+            hint = analyze_all.CARD_HINT if analyze_all.needs_analysis(lst) else status_next_step(lst)
             if hint:
                 st.caption(hint)
         with right:
@@ -89,7 +91,8 @@ def _listing_card(lst: dict, photos: list[dict] | None = None) -> None:
 
 def _render_listings(session: dict) -> None:
     sid = session["id"]
-    st.subheader("매물")
+    title, action = st.columns([4, 1], vertical_alignment="bottom")
+    title.subheader("매물")
     try:
         with st.spinner("매물을 불러오는 중…"):
             listings = api_get(f"/sessions/{sid}/listings")
@@ -101,6 +104,8 @@ def _render_listings(session: dict) -> None:
     if not listings:
         st.info("아직 매물이 없습니다. 아래 '새 메모'에 첫 집 메모를 적고 저장하세요.")
         return
+    with action:
+        analyze_all.render_button(listings, sid)
     photos = _session_photos(sid)
     cards, map_area = st.columns([3, 2])
     with cards:
