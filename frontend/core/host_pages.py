@@ -10,7 +10,7 @@ from core.slots import render_slot, sections_for
 from core.ui import fmt_kst, show_api_error
 
 
-def _back_to_sessions(label: str = "세션 목록으로") -> None:
+def _back_to_sessions(label: str = "← 세션") -> None:
     if st.button(label, key="host_back_sessions"):
         nav.go_sessions()
 
@@ -19,7 +19,7 @@ def render_session_detail() -> None:
     sid = st.session_state.get(state.SELECTED_SESSION_ID)
     if not sid:
         st.subheader("세션 상세")
-        st.info("볼 세션을 아직 고르지 않았습니다. 세션 목록에서 세션을 고르세요.")
+        st.info("볼 세션을 아직 고르지 않았습니다. 사이드바의 '세션'에서 세션을 고르세요.")
         _back_to_sessions()
         return
     try:
@@ -30,6 +30,7 @@ def render_session_detail() -> None:
         _back_to_sessions()
         return
 
+    _back_to_sessions()
     st.title(session["title"])
     visit = session.get("visit_date") or "날짜 미정"
     st.caption(f"방문일 {visit} · 매물 {session.get('listing_count', 0)}곳 · 만든 시각 {fmt_kst(session.get('created_at'))}")

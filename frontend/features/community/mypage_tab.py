@@ -22,4 +22,4 @@ def render_my_posts() -> None:
     except ApiError as e:
         show_error(e)
         return
-    render_post_list(posts, SCOPE, "아직 쓴 발품 후기가 없어요. 사이드바의 '발품 후기 쓰기'에서 써 보세요.")
+    render_post_list(posts, SCOPE, "아직 쓴 발품 후기가 없어요. 사이드바 '발품 후기'의 [발품 후기 쓰기]에서 써 보세요.")

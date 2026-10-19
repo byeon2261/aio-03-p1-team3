@@ -1,4 +1,8 @@
-"""F14 발품 후기 페이지 2개: 쓰기(key balpum_write, order 60) · 목록(key balpum_list, order 65)."""
+"""F14 발품 후기 페이지 2개: 쓰기(key balpum_write, order 60) · 목록(key balpum_list, order 65).
+
+사이드바에는 목록('발품 후기')만 보인다. 쓰기는 목록의 [발품 후기 쓰기] 버튼으로 가고,
+등록을 마치면 목록으로 돌아간다.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ from core import nav
 from core.api import ApiError, api_get, api_post
 from features.community.address_picker import open_search_dialog
 from features.community.components import (
-    opened_post, render_post_detail, render_post_list, show_error, show_flash, upload_photo,
+    opened_post, render_post_detail, render_post_list, set_flash, show_error, show_flash, upload_photo,
 )
 from features.community.view import (
     ADDRESS_MAX, ALL, BODY_MAX, FLOOR_OPTIONS, PHOTO_EXTS, PRIVACY_NOTICE, TITLE_MAX, TOPICS,
@@ -34,6 +38,8 @@ def _clear_write_form() -> None:
 
 
 def render_write() -> None:
+    if st.button("← 발품 후기", key="balpum_w_back"):
+        nav.go_page("balpum_list")
     st.title("발품 후기 쓰기")
     st.caption("직접 방문한 집의 구조·설비·소음·채광 등을 주소 기준으로 공유하세요.")
     if st.session_state.pop(_CLEAR_FLAG, False):
@@ -80,14 +86,14 @@ def render_write() -> None:
     except ApiError as e:
         show_error(e)
         return
-    message = "후기를 등록했습니다. '발품 후기 목록'에서 볼 수 있어요."
+    message = "후기를 등록했습니다."
     if photo is not None:
         with st.spinner("사진을 올리는 중…"):
             if not upload_photo(post["id"], photo):
                 message = "후기는 등록했지만 사진은 올리지 못했습니다. 목록의 내 글에서 다시 올려 주세요."
-    st.session_state["balpum_flash:write"] = message
-    st.session_state[_CLEAR_FLAG] = True
-    st.rerun()
+    set_flash(LIST_SCOPE, message)
+    st.session_state[_CLEAR_FLAG] = True       # 다음에 쓰기 화면을 열면 칸이 비어 있다
+    nav.go_page("balpum_list")
 
 
 # ------------------------------------------------------------------ 목록
@@ -116,13 +122,16 @@ def _search_bar() -> None:
 
 
 def render_list() -> None:
-    st.title("발품 후기 목록")
-    st.caption("집 보러 가기 전, 같은 주소·층의 후기로 확인할 것을 준비하세요.")
+    c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
+    c1.title("발품 후기")
     show_flash(LIST_SCOPE)
     open_id = opened_post(LIST_SCOPE)
     if open_id:
         render_post_detail(open_id, LIST_SCOPE)
         return
+    if c2.button("발품 후기 쓰기", type="primary", key="balpum_list_go_write", width="stretch"):
+        nav.go_page("balpum_write")
+    st.caption("집 보러 가기 전, 같은 주소·층의 후기로 확인할 것을 준비하세요.")
 
     _search_bar()
     params = list_params(_filters())
@@ -137,11 +146,10 @@ def render_list() -> None:
     empty = ("이 조건에 맞는 후기가 아직 없어요. 처음으로 써 보세요." if params
              else "아직 등록된 후기가 없어요. 처음으로 써 보세요.")
     render_post_list(posts, LIST_SCOPE, empty)
-    if not posts and st.button("발품 후기 쓰기", key="balpum_list_go_write"):
-        nav.go_page("balpum_write")
 
 
 PAGES = [
-    {"key": "balpum_write", "title": "발품 후기 쓰기", "order": 60, "admin_only": False, "render": render_write},
-    {"key": "balpum_list", "title": "발품 후기 목록", "order": 65, "admin_only": False, "render": render_list},
+    {"key": "balpum_write", "title": "발품 후기 쓰기", "order": 60, "admin_only": False, "hidden": True,
+     "render": render_write},
+    {"key": "balpum_list", "title": "발품 후기", "order": 65, "admin_only": False, "render": render_list},
 ]

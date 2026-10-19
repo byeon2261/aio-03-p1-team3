@@ -42,6 +42,8 @@ for m in (components, pages, mypage_tab):
 for m in (components, pages):
     m.api_post, m.api_patch = _write("POST"), _write("PATCH")
 components.api_delete = _write("DELETE")
+from core import nav as _nav
+_nav.go_page = lambda key: fake.calls.append(("NAV", key, None))   # 화면 이동은 기록만
 st.session_state.setdefault("auth", {{"access_token": "t", "refresh_token": "r", "expires_at": None,
                                       "profile": {{"id": "me", "nickname": "테스터", "role": "user"}}}})
 """
@@ -87,7 +89,7 @@ def test_community_view_helpers():
 # ------------------------------------------------------------------ 목록
 def test_community_list_shows_all_posts_first(ui_fake):
     at = _app("pages.render_list()")
-    assert at.title[0].value == "발품 후기 목록"
+    assert at.title[0].value == "발품 후기"
     assert ui_fake.calls[0] == ("GET", "/community/posts", {})          # 처음엔 전체
     md = "\n".join(str(m.value) for m in at.markdown)
     assert "밤에 도로 소음이 커요" in md and "`내 글`" in md
@@ -104,6 +106,13 @@ def test_community_list_search_and_reset(ui_fake):
     assert ui_fake.calls[-1] == ("GET", "/community/posts", {"address": "샘플동 123", "floor": 3})
     _button(at, "초기화").click().run()
     assert ui_fake.calls[-1] == ("GET", "/community/posts", {})
+
+
+def test_community_list_write_button_goes_to_write(ui_fake):
+    at = _app("pages.render_list()")
+    _button(at, "발품 후기 쓰기").click().run()
+    assert not at.exception, at.exception
+    assert ("NAV", "balpum_write", None) in ui_fake.calls
 
 
 def test_community_list_empty_message(ui_fake):
@@ -141,6 +150,13 @@ def test_community_detail_delete_with_confirm(ui_fake):
 
 
 # ------------------------------------------------------------------ 쓰기
+def test_community_write_back_button_goes_to_list(ui_fake):
+    at = _app("pages.render_write()")
+    _button(at, "← 발품 후기").click().run()
+    assert not at.exception, at.exception
+    assert ("NAV", "balpum_list", None) in ui_fake.calls
+
+
 def test_community_write_requires_fields_and_agree(ui_fake):
     at = _app("pages.render_write()")
     assert any("연락처·실명은 적지 마세요" in i.value for i in at.info)
@@ -164,8 +180,10 @@ def test_community_write_posts_only_required_fields(ui_fake):
     assert post == [("POST", "/community/posts", {
         "address": "가상시 예시구 샘플동 123-45", "topic": "소음", "title": "밤에 시끄러워요",
         "body": "큰길 쪽 창문이라 밤에 소음이 큽니다.", "floor": None, "visit_date": None})]
-    assert any("후기를 등록했습니다" in s.value for s in at.success)
-    assert next(t for t in at.text_input if t.label == "제목 *").value == ""      # 등록 후 칸을 비운다
+    assert ui_fake.calls[-1] == ("NAV", "balpum_list", None)                     # 등록 후 목록으로 간다
+    assert "후기를 등록했습니다" in at.session_state["balpum_flash:list"]          # 목록에서 보일 안내
+    at.run()                                                                       # 다시 쓰기 화면을 열면
+    assert next(t for t in at.text_input if t.label == "제목 *").value == ""      # 칸이 비어 있다
 
 
 # ------------------------------------------------------------------ 마이페이지 탭
@@ -179,5 +197,5 @@ def test_community_mypage_tab_lists_my_posts(ui_fake):
 def test_community_pages_registered():
     from features.community.pages import PAGES
 
-    assert [(p["key"], p["title"], p["order"]) for p in PAGES] == [
-        ("balpum_write", "발품 후기 쓰기", 60), ("balpum_list", "발품 후기 목록", 65)]
+    assert [(p["key"], p["title"], p["order"], p.get("hidden", False)) for p in PAGES] == [
+        ("balpum_write", "발품 후기 쓰기", 60, True), ("balpum_list", "발품 후기", 65, False)]
