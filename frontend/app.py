@@ -30,6 +30,21 @@ HOST_PAGES = [
      "render": render_listing_detail, "feature": "core"},
 ]
 WAKE_LIMIT_SEC = 60
+# 사이드바 메뉴 아이콘(페이지 key → Material 아이콘). 없는 key는 아이콘 없이 보인다
+PAGE_ICONS = {
+    "sessions": ":material/home_work:",
+    "balpum_list": ":material/forum:",
+    "map": ":material/map:",
+    "mypage": ":material/person:",
+    "admin_logs": ":material/monitoring:",
+    "evals": ":material/compare_arrows:",
+}
+_MD_SPECIAL = str.maketrans({c: "\\" + c for c in "\\`*_{}[]()<>#+-.!|~:"})
+
+
+def _md_escape(text: str) -> str:
+    """닉네임 같은 사용자 입력을 마크다운 서식 없이 그대로 보여 준다."""
+    return str(text).translate(_MD_SPECIAL)
 
 
 def wake_server() -> None:
@@ -55,8 +70,9 @@ def wake_server() -> None:
 def sidebar() -> None:
     with st.sidebar:
         profile = state.current_profile() or {}
-        st.caption(f"{profile.get('nickname', '사용자')} 님" + (" · 운영자" if state.is_admin() else ""))
-        if st.button("로그아웃", key="logout", width="stretch"):
+        role = " :gray[· 운영자]" if state.is_admin() else ""
+        st.markdown(f"**{_md_escape(profile.get('nickname', '사용자'))}** 님{role}")
+        if st.button("로그아웃", key="logout", type="tertiary", icon=":material/logout:"):
             try:
                 api_post("/auth/logout")
             except ApiError:
@@ -80,7 +96,7 @@ def main() -> None:
     default_key = next((p["key"] for p in items if not p.get("hidden")), items[0]["key"])
     pages = {
         p["key"]: st.Page(p["render"], title=p["title"], url_path=p["key"], default=(p["key"] == default_key),
-                          visibility="hidden" if p.get("hidden") else "visible")
+                          icon=PAGE_ICONS.get(p["key"]), visibility="hidden" if p.get("hidden") else "visible")
         for p in items
     }
     nav.register_pages(pages)

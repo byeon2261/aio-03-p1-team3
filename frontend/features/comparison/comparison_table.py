@@ -29,7 +29,7 @@ def _action_hint(rows: list[dict]) -> None:
 def render_comparison(ctx: dict) -> None:
     session = ctx["session"]
     sid = session["id"]
-    st.subheader("매물 비교표", help=TITLE_HELP)
+    st.subheader("📊 매물 비교표", help=TITLE_HELP)
 
     filter_on = bool(st.session_state.get(state.budget_filter_key(sid)))
     params = {"filters": BUDGET_FILTER} if filter_on else None

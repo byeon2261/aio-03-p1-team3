@@ -123,7 +123,7 @@ def render_budget(ctx: dict) -> None:
     if not sid:
         return
     with st.container(border=True):
-        st.subheader("예산")
+        st.subheader("💰 예산")
         flash = st.session_state.pop(_flash_key(sid), None)
         if flash:
             st.success(flash)

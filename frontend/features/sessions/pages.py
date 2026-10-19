@@ -11,10 +11,11 @@ from features.sessions.common import flash, show_flash, visit_text
 
 TITLE_MAX_CHARS = 100
 FLASH_WHERE = "sessions"
+NEW_SESSION_LABEL = ":blue[**➕ 새 집 보기 세션 만들기**]"   # 강조색 글자(테마 blueColor = 강조색)
 
 
 def _create_form(expanded: bool) -> None:
-    with st.expander("새 집 보기 세션 만들기", expanded=expanded):
+    with st.expander(NEW_SESSION_LABEL, expanded=expanded):
         with st.form("p1_new_session", clear_on_submit=False):
             title = st.text_input("제목", max_chars=TITLE_MAX_CHARS, placeholder="예: 10월 셋째 주 토요일 신촌")
             visit_date = st.date_input("방문일 (선택)", value=None, format="YYYY-MM-DD")
@@ -40,7 +41,7 @@ def _session_card(s: dict) -> None:
         st.markdown(f"**{s['title']}**")
         st.caption(f"{visit_text(s.get('visit_date'))} · 매물 {s.get('listing_count', 0)}곳")
         st.caption(f"만든 시각 {fmt_kst(s.get('created_at'))}")
-        if st.button("열기", key=f"p1_open_session:{s['id']}", width="stretch"):
+        if st.button("상세 보기 →", key=f"p1_open_session:{s['id']}", type="tertiary", width="stretch"):
             nav.go_session_detail(s["id"])
 
 
@@ -61,7 +62,7 @@ def render_sessions() -> None:
     _create_form(expanded=not sessions)
 
     if not sessions:
-        st.info("첫 집 보기 세션을 만들어 보세요. 위의 '새 집 보기 세션 만들기'에서 제목을 적고 만들면 됩니다.")
+        st.info("첫 집 보기 세션을 만들어 보세요. 위의 '➕ 새 집 보기 세션 만들기'에서 제목을 적고 만들면 됩니다.")
         return
 
     st.subheader(f"내 세션 {len(sessions)}개")

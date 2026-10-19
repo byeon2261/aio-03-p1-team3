@@ -13,7 +13,7 @@ from typing import Any
 from core.ui import fmt_manwon
 
 NO_VALUE = "—"
-MAX_CHECK_CHIPS = 2
+MAX_CHIPS = 3        # 카드 한 장에 보이는 칩 수. 넘치면 회색 '+N'
 
 # latest_analysis_status → 칩
 ANALYSIS_CHIPS = {
@@ -68,12 +68,12 @@ def summary_metrics(listings: list[dict], comparison: dict | None) -> list[dict]
     costs = [c for c in (_int(v.get("monthly_cost_manwon")) for v in analyzed) if c is not None]
     checks = sum(len(v.get("followup_checks") or []) for v in analyzed)
     return [
-        {"label": "본 집", "value": f"{len(listings)}곳", "help": "이 세션에 저장한 매물 수입니다."},
-        {"label": "예산 안", "value": f"{judged.count('within')}곳" if judged else NO_VALUE,
+        {"label": "🏠 본 집", "value": f"{len(listings)}곳", "help": "이 세션에 저장한 매물 수입니다."},
+        {"label": "✅ 예산 안", "value": f"{judged.count('within')}곳" if judged else NO_VALUE,
          "help": "예산 판정이 '예산 안'인 매물 수입니다. 예산을 정하고 매물이 2곳 이상이면 보입니다."},
-        {"label": "확인 필요", "value": f"{checks}건" if analyzed else NO_VALUE,
+        {"label": "⚠️ 확인 필요", "value": f"{checks}건" if analyzed else NO_VALUE,
          "help": "AI가 메모에서 확인하지 못했거나 애매하다고 본 항목 수의 합입니다. 집주인에게 꼭 물어보세요."},
-        {"label": "최저 월 고정비", "value": fmt_manwon(min(costs)) if costs else NO_VALUE,
+        {"label": "💸 최저 월 고정비", "value": fmt_manwon(min(costs)) if costs else NO_VALUE,
          "help": "월 고정비 = 월세 + 관리비. 관리비가 미기재인 매물은 빠집니다."},
     ]
 
@@ -92,17 +92,19 @@ def info_line(listing: dict, row: dict | None) -> str:
 
 
 def chips(listing: dict, row: dict | None) -> list[str]:
-    """상태 칩(마크다운 배지): 분석 상태 → 재분석 필요 → 예산 판정 → 추가 확인 항목 2개 + 나머지 수."""
+    """상태 칩(마크다운 배지, 이모지 없음). 순서: 분석 상태 → 재분석 필요 → 예산 판정 → 추가 확인 항목.
+
+    최대 MAX_CHIPS개만 보이고 나머지는 회색 "+N" 한 개로 묶는다.
+    """
     out = [ANALYSIS_CHIPS.get(listing.get("latest_analysis_status") or "none", ANALYSIS_CHIPS["none"])]
     if listing.get("needs_reanalysis"):
         out.append(REANALYSIS_CHIP)
     budget = BUDGET_CHIPS.get(budget_status(row) or "")
     if budget:
         out.append(budget)
-    checks = [str(c) for c in _values(row).get("followup_checks") or []]
-    out += [f":blue-badge[{c} 확인]" for c in checks[:MAX_CHECK_CHIPS]]
-    if len(checks) > MAX_CHECK_CHIPS:
-        out.append(f":gray-badge[확인 +{len(checks) - MAX_CHECK_CHIPS}]")
+    out += [f":blue-badge[{c} 확인]" for c in (str(c) for c in _values(row).get("followup_checks") or [])]
+    if len(out) > MAX_CHIPS:
+        out = out[:MAX_CHIPS] + [f":gray-badge[+{len(out) - MAX_CHIPS}]"]
     return out
 
 

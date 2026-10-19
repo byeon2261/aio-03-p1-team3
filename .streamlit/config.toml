@@ -38,7 +38,7 @@ baseRadius = "0.625rem"               # 10px: 입력칸·상자
 buttonRadius = "0.5rem"               # 8px
 
 [theme.sidebar]
-backgroundColor = "#FFFFFF"
+backgroundColor = "#F7F9FC"           # 연한 회청색. 선택한 메뉴는 흰 알약(theme.css)
 secondaryBackgroundColor = "#EEF2FB"
 textColor = "#110D3C"
 borderColor = "#E3E8F2"

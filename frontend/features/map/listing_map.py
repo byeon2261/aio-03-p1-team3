@@ -31,7 +31,7 @@ def render_session_map(session: dict, listings: list[dict]) -> None:
         return
     missing = len(listings) - len(pins)
     if not pins:
-        st.info("아직 위치를 넣은 매물이 없습니다. 매물을 열고 '위치'에서 주소를 검색해 저장하면 여기에 표시됩니다.")
+        st.caption("아직 위치를 넣은 매물이 없습니다. 매물을 열고 '위치'에서 주소를 검색해 저장하면 여기에 표시됩니다.")
         return
     api_key = components.current_api_key()
     if not api_key:

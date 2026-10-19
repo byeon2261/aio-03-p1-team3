@@ -78,9 +78,10 @@ def show_api_error(e: Exception) -> None:
         st.caption(f"문의 시 요청 번호: {rid}")
 
 
+PRIVACY_TEXT = ("실제 주소·연락처·실명을 적지 마세요. 메모는 AI(Gemini 무료 등급)로 정리되며, "
+                "입력 내용이 Google 제품 개선에 쓰일 수 있습니다.")
+
+
 def privacy_notice() -> None:
-    st.info(
-        "실제 주소·연락처·실명을 적지 마세요. 메모는 AI(Gemini 무료 등급)로 정리되며, "
-        "입력 내용이 Google 제품 개선에 쓰일 수 있습니다.",
-        icon="🔒",
-    )
+    """모든 화면 맨 위의 개인정보 안내. 작은 회색 한 줄(자물쇠 아이콘 + 문구)."""
+    st.caption(f":material/lock: {PRIVACY_TEXT}")

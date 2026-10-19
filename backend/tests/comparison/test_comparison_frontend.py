@@ -51,7 +51,7 @@ def test_comparison_title_has_help_and_includes_column(ui_fake):
     at.run()
     assert not at.exception, at.exception
     title = at.subheader[0]
-    assert title.value == "매물 비교표"
+    assert title.value == "📊 매물 비교표"
     assert title.proto.help == comparison_table.TITLE_HELP
     table = next(m.value for m in at.markdown if m.value.startswith("| 매물"))
     assert "포함 내역" in table.splitlines()[0] and "인터넷, 수도" in table

@@ -1,8 +1,9 @@
 """F2·F3 상세 화면 섹션.
 
 - session_detail (order 10): 맨 위 요약 숫자 카드(본 집·예산 안·확인 필요·최저 월 고정비), 매물 카드 목록
-  (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[열기]), 오른쪽 열에 'AI로 한 번에 정리' 배너([AI 정리])와
-  F13 매물 지도, 새 메모 입력, 세션 제목·방문일 수정, 세션 삭제.
+  (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[상세 보기 →]), 오른쪽 열에 '✨ 정리 안 된 매물 N곳' 배너
+  ([AI로 정리하기])와 F13 매물 지도, 그 아래 '➕ 새 매물 메모 추가' 펼침 상자(매물이 없으면 펼친 상태).
+- session_detail (order 90): 페이지 맨 아래 '⚙️ 세션 관리' 펼침 상자(세션 제목·방문일 수정, 세션 삭제).
   요약 숫자·카드 숫자·예산 칩은 같은 화면의 비교표가 쓰는 GET /sessions/{id}/comparison 응답에서 만든다(summary.py).
 - listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
 """
@@ -88,46 +89,64 @@ def _render_summary(listings: list[dict], comparison: dict | None) -> None:
         st.caption("요약 숫자를 불러오지 못했습니다. 아래 매물 비교표에서 확인하거나 새로 고쳐 주세요.")
 
 
+NO_PHOTO_ICON = (  # 집 아이콘(사진이 없는 매물 자리). 강조색, 선만
+    '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#3246d3" stroke-width="1.6" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg>'
+)
+ONE_LINE = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+MUTED = "#64636d"
+
+
 def _no_photo() -> None:
     st.markdown(
-        '<div style="width:100%;aspect-ratio:4/3;max-height:120px;border-radius:10px;background:#eef2fb;display:flex;'
-        'align-items:center;justify-content:center;color:#64636d;font-size:12px">사진 없음</div>',
+        '<div role="img" aria-label="사진 없음" style="width:100%;aspect-ratio:4/3;max-height:120px;'
+        'border-radius:12px;background:linear-gradient(135deg,#eef2fb 0%,#e3e9fb 100%);display:flex;'
+        f'align-items:center;justify-content:center;opacity:.9">{NO_PHOTO_ICON}</div>',
         unsafe_allow_html=True,
     )
 
 
-def _price(row: dict | None) -> None:
-    lines = summary.price_lines(row)
-    if not lines:
-        return
-    main, sub = lines
-    sub_html = "<br>".join(html.escape(part) for part in sub.split(" · "))   # 좁은 칸에서 한 줄씩
+def _card_title(label: str, info: str) -> None:
+    """제목(크고 굵게) + 한 줄 정보(작은 회색, 넘치면 …)."""
     st.markdown(
-        f'<div style="text-align:right;line-height:1.3;margin-bottom:6px"><div style="font-size:1.35rem;'
-        f'font-weight:800;color:#3246d3">{html.escape(main)}</div>'
-        f'<div style="font-size:12px;color:#64636d">{sub_html}</div></div>',
+        f'<div style="font-size:1.15rem;font-weight:800;line-height:1.3;color:#110d3c">{html.escape(label)}</div>'
+        f'<div title="{html.escape(info, quote=True)}" style="font-size:13px;color:{MUTED};margin-top:2px;'
+        f'{ONE_LINE}">{html.escape(info)}</div>',
         unsafe_allow_html=True,
     )
+
+
+def _price(row: dict | None, hint: str = "") -> None:
+    """오른쪽 위: 월 고정비(파란 큰 숫자)와 보조 줄. 분석 값이 없으면 짧은 안내 한 줄."""
+    lines = summary.price_lines(row)
+    if lines:
+        main, sub = lines
+        sub_html = "<br>".join(html.escape(part) for part in sub.split(" · "))   # 좁은 칸에서 한 줄씩
+        body = (f'<div style="font-size:1.4rem;font-weight:800;color:#3246d3;letter-spacing:-.01em">'
+                f'{html.escape(main)}</div><div style="font-size:12px;color:{MUTED}">{sub_html}</div>')
+    elif hint:
+        body = f'<div style="font-size:13px;color:{MUTED};{ONE_LINE}">{html.escape(hint)}</div>'
+    else:
+        return
+    st.markdown(f'<div style="text-align:right;line-height:1.35">{body}</div>', unsafe_allow_html=True)
 
 
 def _listing_card(lst: dict, photos: list[dict] | None = None, row: dict | None = None) -> None:
     with st.container(border=True):
-        thumb, left, right = st.columns([1.2, 3, 1.4], vertical_alignment="center")
+        thumb, left, right = st.columns([1.1, 3, 1.4], vertical_alignment="center")
         with thumb:
             if photos:
                 _thumbnail(photos, lst["label"])
             else:
                 _no_photo()
         with left:
-            st.markdown(f"**{lst['label']}**")
-            st.caption(summary.info_line(lst, row))
+            _card_title(lst["label"], summary.info_line(lst, row))
             st.markdown(" ".join(summary.chips(lst, row)))
-            hint = analyze_all.CARD_HINT if analyze_all.needs_analysis(lst) else status_next_step(lst)
-            if hint:
-                st.caption(hint)
         with right:
-            _price(row)
-            if st.button("열기", key=f"p1_open_listing:{lst['id']}", width="stretch"):
+            hint = analyze_all.CARD_HINT if analyze_all.needs_analysis(lst) else status_next_step(lst)
+            _price(row, hint)
+            if st.button("상세 보기 →", key=f"p1_open_listing:{lst['id']}", type="tertiary", width="stretch"):
                 nav.go_listing_detail(lst["id"])
 
 
@@ -137,18 +156,18 @@ def _render_listings(session: dict) -> None:
         with st.spinner("매물을 불러오는 중…"):
             listings = api_get(f"/sessions/{sid}/listings")
     except ApiError as e:
-        st.subheader("매물")
+        st.subheader("🏠 매물")
         show_api_error(e)
         if st.button("다시 시도", key=f"p1_listings_retry:{sid}"):
             st.rerun()
         return
     if not listings:
-        st.subheader("매물")
-        st.info("아직 매물이 없습니다. 아래 '새 메모'에 첫 집 메모를 적고 저장하세요.")
+        st.subheader("🏠 매물")
+        st.info("아직 매물이 없습니다. 아래 '➕ 새 매물 메모 추가'에 첫 집 메모를 적고 저장하세요.")
         return
     comparison = _session_comparison(sid)
     _render_summary(listings, comparison)
-    st.subheader("매물")
+    st.subheader("🏠 매물")
     photos = _session_photos(sid)
     rows = summary.rows_by_listing(comparison)
     cards, side = st.columns([3, 2])
@@ -159,31 +178,37 @@ def _render_listings(session: dict) -> None:
             st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
     with side:
         analyze_all.render_banner(listings, sid)
+        st.subheader("📍 지도")
         # F13: 위치를 넣은 매물을 지도에 찍는다(features/map/listing_map.py)
         render_session_map(session, listings)
 
 
+NEW_MEMO_LABEL = "➕ 새 매물 메모 추가"
+MANAGE_LABEL = "⚙️ 세션 관리"
+
+
 def _render_new_memo(session: dict) -> None:
+    """매물 목록 바로 아래 펼침 상자. 매물이 없으면 처음부터 펼쳐 둔다."""
     sid = session["id"]
-    st.subheader("새 메모")
 
     def save(text: str) -> str:
         created = api_post(f"/sessions/{sid}/listings", json={"memo_text": text})
         return f"{created['label']}을(를) 저장했습니다. 매물을 눌러 분석을 실행하거나 다음 집 메모를 적으세요."
 
-    render_memo_editor(scope=f"new:{sid}", draft_path=f"/sessions/{sid}/draft", initial_text="",
-                       label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
-                       on_save=save, clear_after_save=True)
+    with st.expander(NEW_MEMO_LABEL, expanded=not session.get("listing_count")):
+        render_memo_editor(scope=f"new:{sid}", draft_path=f"/sessions/{sid}/draft", initial_text="",
+                           label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
+                           on_save=save, clear_after_save=True)
 
 
 def _render_session_edit(session: dict) -> None:
     sid = session["id"]
-    with st.expander("세션 제목·방문일 수정"):
-        with st.form(f"p1_edit_session:{sid}"):
-            title = st.text_input("제목", value=session.get("title") or "", max_chars=TITLE_MAX_CHARS)
-            visit = st.date_input("방문일", value=parse_date(session.get("visit_date")), format="YYYY-MM-DD")
-            clear_visit = st.checkbox("방문일 비우기")
-            submitted = st.form_submit_button("수정 저장")
+    st.markdown("**세션 제목·방문일 수정**")
+    with st.form(f"p1_edit_session:{sid}"):
+        title = st.text_input("제목", value=session.get("title") or "", max_chars=TITLE_MAX_CHARS)
+        visit = st.date_input("방문일", value=parse_date(session.get("visit_date")), format="YYYY-MM-DD")
+        clear_visit = st.checkbox("방문일 비우기")
+        submitted = st.form_submit_button("수정 저장")
     if not submitted:
         return
     if not title.strip():
@@ -237,11 +262,20 @@ def render_session_section(ctx: dict) -> None:
     session = ctx["session"]
     show_flash("session_detail")
     _render_listings(session)
-    st.divider()
     _render_new_memo(session)
-    st.divider()
-    _render_session_edit(session)
-    _render_session_delete(session)
+
+
+def render_session_manage(ctx: dict) -> None:
+    """페이지 맨 아래(order 90): 세션 제목·방문일 수정과 세션 삭제를 접힌 펼침 상자 하나로.
+
+    삭제 확인 중에는 펼친 채로 둔다(확인 문구와 [삭제]/[취소]가 상자 안에 있다).
+    """
+    session = ctx["session"]
+    confirming = bool(st.session_state.get(_confirm_key("session", session["id"])))
+    with st.expander(MANAGE_LABEL, expanded=confirming):
+        _render_session_edit(session)
+        st.divider()
+        _render_session_delete(session)
 
 
 # ------------------------------------------------------------------ listing_detail
@@ -302,5 +336,6 @@ def render_listing_section(ctx: dict) -> None:
 
 SECTIONS = [
     {"slot": "session_detail", "order": 10, "render": render_session_section},
+    {"slot": "session_detail", "order": 90, "render": render_session_manage},
     {"slot": "listing_detail", "order": 10, "render": render_listing_section},
 ]

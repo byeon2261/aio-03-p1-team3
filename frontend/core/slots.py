@@ -2,7 +2,7 @@
 
 슬롯
     session_detail  ctx = {"session": SessionOut dict}
-                    P1 매물 목록·새 메모 10 · P5 예산 20 · P3 비교표 30
+                    P1 매물 목록·새 메모 10 · P5 예산 20 · F12 가중치 25 · P3 비교표 30 · F12 순위 35 · P1 세션 관리 90
     listing_detail  ctx = {"listing": ListingOut dict, "session": SessionOut dict}
                     P1 메모 편집 10 · P2 분석 결과 20 · P3 수정·피드백 30 · P4 사진 40
 한 섹션이 예외를 내도 나머지 섹션은 그린다(st.rerun·st.switch_page·st.stop은 그대로 통과).

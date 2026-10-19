@@ -204,7 +204,7 @@ def render_scoring_settings(ctx: dict) -> None:
     if not sid:
         return
     with st.container(border=True):
-        st.subheader("항목 가중치")
+        st.subheader("⚖️ 항목 가중치")
         _show_flash(sid)
         _show_flash("profiles")
         profiles = _load_profiles()
@@ -250,13 +250,13 @@ def render_ranking(ctx: dict) -> None:
         with st.spinner("적합도를 계산하는 중…"):
             data = api_get(f"/sessions/{sid}/scores", params=params)
     except ApiError as e:
-        st.subheader("적합도 순위")
+        st.subheader("🏆 적합도 순위")
         show_api_error(e)
         _retry_button(f"scoring_rank_retry:{sid}")
         return
     if not (data.get("setting") or {}).get("enabled", True):
         return   # 꺼져 있으면 순위를 보여 주지 않는다
-    st.subheader("적합도 순위")
+    st.subheader("🏆 적합도 순위")
     setting = data.get("setting") or {}
     st.caption(f"가중치 프로필: {setting.get('weight_profile_name') or '선택 안 함 (모든 항목 같은 가중치)'}")
     hidden = hidden_message(data) if filter_on else None

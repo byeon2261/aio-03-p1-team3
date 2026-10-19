@@ -81,12 +81,13 @@ def test_listing_card_shows_first_photo_with_count(fake):
     assert "https://example.com/p-1.png?token=x&amp;y=1" in md      # 처음 올린 사진, URL은 escape
     assert "p-other" not in md and "p-2.png" not in md
     assert "+1</span>" in md
-    assert "**2번 집**" in md and fake.calls.count("/me/photos") == 1
+    assert ">2번 집</div>" in md and fake.calls.count("/me/photos") == 1         # 카드 제목
 
 
 def test_listing_card_without_photos_or_on_error(fake):
     fake.errors.add("/me/photos")
     at = _app()
     md = _html(at)
-    assert "<img " not in md and "**1번 집**" in md and "**2번 집**" in md
+    assert "<img " not in md and ">1번 집</div>" in md and ">2번 집</div>" in md
+    assert md.count('aria-label="사진 없음"') == 2                    # 사진 없는 자리는 집 아이콘
     assert not at.error                                             # 사진 실패는 조용히 넘어간다
