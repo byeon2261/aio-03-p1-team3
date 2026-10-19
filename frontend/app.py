@@ -8,10 +8,13 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import streamlit as st
 
 st.set_page_config(page_title="집 보기 메모 비교", page_icon="🏠", layout="wide")
+# 공통 스타일(카드·탭·헤더). 색·글꼴은 .streamlit/config.toml [theme]. CSS만 있어 화면 자리를 차지하지 않는다
+st.html(Path(__file__).resolve().parent / "core" / "theme.css")
 
 from core import nav, slots, state  # noqa: E402
 from core.api import ApiError, api_post, ping_health  # noqa: E402

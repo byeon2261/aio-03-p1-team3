@@ -1,7 +1,7 @@
 # 화면 설계서 (SCREEN_DESIGN)
 
 집 보기 메모 비교 서비스의 화면 설계서입니다. 실제 화면 코드(`frontend/`)를 읽고 그 내용대로 썼습니다.
-기준: `main` 2026-10-19 (PR #34까지 병합 뒤). 화면을 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
+기준: `main` 2026-10-19 (PR #34까지 병합 뒤) + 2026-10-20 공통 테마(`feat/ui-theme`). 화면을 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
 
 - 화면 기술: Streamlit 1.65 (`frontend/app.py` 진입점, `layout="wide"`).
 - 서버 호출: 모든 화면은 `frontend/core/api.py`로 FastAPI 서버를 부릅니다. 엔드포인트의 요청·응답 형식은 API 설계 문서(`docs/API_DESIGN.md`)와 `docs/CONTRACT.md`를 봅니다.
@@ -110,20 +110,28 @@ flowchart TD
 
 ## 3. 공통 UI 기준
 
-팀 전용 테마는 두지 않았습니다(`.streamlit/config.toml`에 `[theme]` 없음). 그래서 기본 색·폰트·여백은 Streamlit 기본 테마를 따르고, 아래 규칙은 코드가 Streamlit 부품을 쓰는 방식으로 정합니다. UI 디자인 개선은 현재 보류입니다(`docs/PROJECT_CONTEXT.md` 3절).
+"회색 배경 위에 흰 카드" 팀 테마를 씁니다. 두 곳에서 정합니다.
+
+- `.streamlit/config.toml` `[theme]`·`[theme.sidebar]`: 색·글꼴·글꼴 굵기·기본 모서리(Streamlit 테마 키).
+- `frontend/core/theme.css`: 테마 키로 못 정하는 카드 그림자·안쪽 여백, 탭·사이드바 메뉴, 헤더·본문 폭. `app.py`가 `st.html`로 한 번 불러옵니다(CSS만 있어 화면 자리를 차지하지 않음).
+- CSS 선택자는 `data-testid`와 상태 속성(`aria-current`, `data-selected`)만 씁니다. Streamlit 내부 클래스명(`.st-emotion-cache-…`)은 버전마다 바뀌어 쓰지 않습니다.
+- `[client] toolbarMode = "minimal"`로 오른쪽 위 메뉴의 개발용 항목(Deploy·다시 실행·캐시 지우기)을 빼고, CSS로 헤더 배경을 투명하게 하고 Deploy 버튼을 숨깁니다. 헤더 자체는 숨기지 않습니다(사이드바 열기 버튼이 헤더 안에 있음). Community Cloud의 "Manage app" 버튼은 앱 바깥에 그려져 숨길 수 없습니다(관리자 계정에만 보임).
+- 다크 모드는 따로 맞추지 않습니다(`base = "light"`).
 
 ### 3.1 레이아웃과 여백
 
 | 항목 | 기준 | 근거 |
 |---|---|---|
-| 페이지 폭 | 넓은 화면(`layout="wide"`). 사이드바 + 본문 | `app.py` `st.set_page_config` |
+| 페이지 폭 | 넓은 화면(`layout="wide"`). 사이드바 + 본문. 본문 최대 폭 1200px, 위 여백 3rem·아래 4rem | `app.py` `st.set_page_config`, `theme.css` `stMainBlockContainer` |
 | 페이지 머리 | 제목(`st.title`) 1개 → 한 줄 설명(`st.caption`) | 모든 페이지 |
 | 섹션 머리 | 소제목(`st.subheader`) | 상세 화면 섹션 |
-| 섹션 구분 | 같은 섹션 안 덩어리 사이는 구분선(`st.divider`), 독립 기능 섹션은 테두리 상자(`st.container(border=True)`) | 세션 상세, 예산·가중치·만족도 |
-| 카드 | 테두리 상자 안에 굵은 이름 + 회색 보조 줄(caption) + 오른쪽 [열기]/[자세히] 버튼 | 세션·매물·후기 카드 |
+| 섹션 구분 | 같은 섹션 안 덩어리 사이는 구분선(`st.divider`), 독립 기능 섹션은 카드(`st.container(border=True)`) | 세션 상세, 예산·가중치·만족도 |
+| 카드 | 흰 바탕, 테두리 `#E3E8F2`, 모서리 16px, 부드러운 그림자, 안쪽 여백 1.25rem 1.5rem. 굵은 이름 + 회색 보조 줄(caption) + 오른쪽 [열기]/[자세히] 버튼 | 세션·매물·후기 카드, `theme.css` |
+| 카드가 되는 부품 | `st.container(border=True)`, `st.form`, `st.expander`, `st.metric`. 카드 안의 카드는 그림자 없이 평평하게 | `theme.css` |
+| 카드 규칙 | **`st.container`는 카드 용도로만, 항상 `border=True`로 씁니다.** Streamlit 1.65에는 테두리 있는 컨테이너만 고르는 `data-testid`가 없어 `stLayoutWrapper > stVerticalBlock`(= 모든 `st.container()`)을 카드로 그리기 때문입니다. 카드가 아닌 묶음은 `st.columns`나 섹션 순서로 나눕니다 | `theme.css` 머리 주석 |
 | 그리드 | 세션 카드 3열, 사진 3열, 매물 목록 : 지도 = 3 : 2, 지표 카드 4열 2줄, 요약 지표 5열 | 각 화면 코드 |
-| 예외 | 전체 매물(S6)만 본문 여백을 0으로 없애 지도를 사이드바 오른쪽 전체에 채움 | `features/map/pages.py` `FULL_BLEED_CSS` |
-| 여백 값 | Streamlit 기본 간격을 그대로 씀(따로 정한 px 값 없음) | — |
+| 예외 | 전체 매물(S6)만 본문 여백을 0으로 없애 지도를 사이드바 오른쪽 전체에 채움(`!important`라 공통 여백보다 앞섬) | `features/map/pages.py` `FULL_BLEED_CSS` |
+| 여백 값 | 카드 안쪽 여백·본문 폭·위 여백 외에는 Streamlit 기본 간격 | `theme.css` |
 
 ### 3.2 색상
 
@@ -138,10 +146,24 @@ flowchart TD
 | 오류·실패 | `st.error`(빨간 상자), `:red[…]` | 서버 오류, 분석 상태 `분석 실패` |
 | 비활성·없음 | `:gray[…]`, `st.caption`(회색 글씨) | `분석 전`, 보조 설명 |
 | 비교표 최저값 | `:blue[**값** 최저]` | 월세·관리비 최저 매물 |
-| 주 버튼 | `type="primary"`(Streamlit 기본 강조색) | 저장·등록·실행 |
+| 주 버튼 | `type="primary"`(강조색 `#3246D3` 바탕·흰 글씨) | 저장·등록·실행 |
 | 일반 버튼 | 기본 버튼(흰 바탕 테두리) | 취소·다시 시도·열기 |
 
-- Streamlit 기본 강조색은 공식 문서에 값이 적혀 있지 않습니다. 설치된 Streamlit 1.65 정적 파일에서는 `#ff4b4b`(빨강 계열)를 확인했습니다.
+테마 색(`.streamlit/config.toml` `[theme]`):
+
+| 키 | 값 | 쓰임 |
+|---|---|---|
+| `primaryColor` | `#3246D3` | 주 버튼, 선택한 탭 글자·밑줄, 링크, 사이드바 선택 메뉴 글자 |
+| `backgroundColor` | `#F4F6FB` | 앱 배경(연회색). 카드는 `#FFFFFF`(`theme.css`) |
+| `secondaryBackgroundColor` | `#EEF2FB` | 입력칸·선택 상자 바탕 |
+| `textColor` | `#110D3C` | 본문·제목 글씨 |
+| `grayTextColor` | `#64636D` | `:gray[…]` 보조 글씨, 지표 이름, 안 고른 탭 |
+| `borderColor` | `#E3E8F2` | 카드·입력칸·표 테두리 |
+| `blueColor` | `#3246D3` | `st.info`, 비교표 최저값 `:blue[…]` |
+| `greenColor` · `redColor` | `#16A34A` · `#E5484D` | 성공·`분석 완료`·`예산 안` / 오류·`분석 실패`·`예산 초과` |
+| `[theme.sidebar] backgroundColor` | `#FFFFFF` | 사이드바. 선택한 메뉴는 연파랑(`#EAEEFC`) 바탕·강조색 굵은 글자, 모서리 10px |
+
+- 노랑·주황은 Streamlit 기본값을 씁니다.
 - 코드에서 직접 정한 색은 지도 부품(`features/map/components.py`, 파란 계열 핀·회색 글씨 카드)과 매물 카드 사진의 `+N` 표시(짙은 반투명 바탕·흰 글씨)뿐입니다.
 - 운영 대시보드의 상태 열은 아이콘으로 구분합니다: `✅ 200`(400 미만) · `⚠️ 404`(4xx) · `🛑 500`(5xx) (`features/admin_logs/logic.py` `status_badge`).
 
@@ -149,8 +171,9 @@ flowchart TD
 
 | 항목 | 기준 |
 |---|---|
-| 글꼴 | Streamlit 기본 글꼴(Source Sans 계열). 코드 블록만 고정폭 |
+| 글꼴 | Pretendard(`Pretendard Variable`, jsDelivr CDN에서 `[theme] font`로 불러옴). 못 불러오면 기본 sans-serif. 코드 블록만 고정폭 |
 | 기본 크기 | 16px(Streamlit 공식 문서: `baseFontSize`를 정하지 않으면 16px) |
+| 굵기 | 본문 400, 페이지 제목(h1) 800, 소제목(h2·h3) 700, 지표 숫자 800, 입력 라벨 500, 지표 이름 600 |
 | 크기 단계 | 페이지 제목 `st.title` > 섹션 `st.subheader` > 본문 `st.markdown` > 보조 `st.caption`(작은 회색) |
 | 강조 | 굵게(`**…**`)는 이름·라벨에만. 금액은 `st.metric` 큰 숫자 |
 | 지도 카드 | 부모 글꼴을 그대로 씀(`font-family: inherit`), 12~13px |
@@ -162,6 +185,8 @@ flowchart TD
 | 주 버튼 1개 | 한 덩어리에 주 버튼(`primary`)은 하나만 둡니다(저장·등록·실행). 같이 있는 [취소]·[비우기]·[임시 저장]은 일반 버튼 |
 | 버튼 문구 | 하는 일을 동사로: "메모 저장", "AI로 정리하기", "이 사진 올리기", "이 위치로 저장" |
 | 폭 | 카드 안·두 버튼 나란히는 칸을 꽉 채움(`width="stretch"`) |
+| 모양 | 모서리 8px(`buttonRadius`), 높이 2.5rem 이상, 좌우 여백 1rem, 글자 600. 주 버튼은 옅은 강조색 그림자. 입력칸·상자 모서리는 10px(`baseRadius`) |
+| 탭 | 글자 + 강조색 밑줄. 선택한 탭은 강조색 굵은 글자, 안 고른 탭은 회색 |
 | 비활성 | 할 수 없는 상태면 회색 비활성(`disabled`): 메모가 비면 [AI로 정리하기], 평가 실행 중이면 [평가 실행], 좌표가 없으면 [이 위치로 저장] |
 | 삭제 2단계 | [삭제] → 노란 경고("…되돌릴 수 없습니다.") → [삭제](주 버튼) / [취소]. 세션·매물·사진·발품 후기 모두 같음 |
 | 다시 시도 | 목록을 못 불러오면 오류 문구 아래 [다시 시도] |
@@ -182,7 +207,7 @@ flowchart TD
 
 | 표 | 그리는 방법 | 규칙 |
 |---|---|---|
-| 매물 비교표·적합도 순위 | 마크다운 표(`st.markdown`) | 행 = 매물, 열 = 매물·상태·항목·추가 열(예산·적합도). `미기재` = 메모에 없음(0원 아님), `—` = 분석 결과 없음. 최저값은 파란 굵은 글씨 |
+| 매물 비교표·적합도 순위 | 마크다운 표(`st.markdown`). 흰 바탕, 모서리 12px, 머리 줄 연회색(`#F7F8FC`) 굵게 | 행 = 매물, 열 = 매물·상태·항목·추가 열(예산·적합도). `미기재` = 메모에 없음(0원 아님), `—` = 분석 결과 없음. 최저값은 파란 굵은 글씨 |
 | 운영 로그·지표·평가 실행 | `st.dataframe`(정렬·스크롤 되는 표) | 행 번호 숨김, 폭 꽉 채움. 실시간 로그 표는 높이 360px, 최근 100건 |
 
 ### 3.7 차트

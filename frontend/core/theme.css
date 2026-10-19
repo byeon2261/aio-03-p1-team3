@@ -1,0 +1,140 @@
+/* 화면 전체 공통 스타일 — app.py가 한 번 불러온다(st.html, Streamlit 1.65).
+ *
+ * 색·글꼴·기본 모서리는 .streamlit/config.toml [theme]에서 정하고, 여기서는 테마 키로 못 정하는
+ * 카드 그림자·여백·탭·헤더만 다룬다. 기준은 docs/SCREEN_DESIGN.md 3절.
+ *
+ * 선택자 규칙: Streamlit 내부 클래스명(.st-emotion-cache-…, .e1abc…)은 버전마다 바뀌므로 쓰지 않는다.
+ * data-testid와 ARIA/상태 속성(aria-current, data-selected)만 쓴다.
+ *
+ * 카드: 1.65에는 "테두리 있는 컨테이너"만 고르는 data-testid가 없다. st.container()는 모두
+ * stLayoutWrapper 바로 아래 stVerticalBlock으로 그려지므로 그 조합을 카드로 본다.
+ * 그래서 이 저장소에서는 st.container()를 카드 용도로만, 항상 border=True로 쓴다.
+ */
+
+:root {
+  --ht-card-bg: #ffffff;
+  --ht-card-radius: 16px;
+  --ht-card-pad: 1.25rem 1.5rem;
+  --ht-card-shadow: 0 1px 2px rgba(17, 13, 60, 0.04), 0 4px 16px rgba(17, 13, 60, 0.06);
+  --ht-card-border: #e3e8f2;
+  --ht-accent: #3246d3;
+  --ht-accent-soft: #eaeefc;
+  --ht-muted: #64636d;
+}
+
+/* ---------------------------------------------------------------- 개발 도구 티 지우기 */
+/* 헤더는 숨기지 않는다: 사이드바 열기 버튼(stExpandSidebarButton)이 헤더 안에 있다 */
+[data-testid="stHeader"] {
+  background: transparent;
+}
+[data-testid="stAppDeployButton"] {
+  display: none;
+}
+
+/* 본문 최대 폭·위아래 여백 (전체 매물 지도 페이지는 자기 CSS의 !important로 여백을 없앤다) */
+[data-testid="stMainBlockContainer"] {
+  max-width: 1200px;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+/* ---------------------------------------------------------------- 글꼴 굵기 대비 */
+[data-testid="stMain"] [data-testid="stHeading"] h1 {
+  letter-spacing: -0.02em;
+}
+[data-testid="stMain"] [data-testid="stHeading"] h2,
+[data-testid="stMain"] [data-testid="stHeading"] h3 {
+  letter-spacing: -0.01em;
+}
+[data-testid="stWidgetLabel"] p {
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- 카드 */
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stMain"] [data-testid="stForm"],
+[data-testid="stMain"] [data-testid="stMetric"] {
+  background: var(--ht-card-bg);
+  border: 1px solid var(--ht-card-border);
+  border-radius: var(--ht-card-radius);
+  box-shadow: var(--ht-card-shadow);
+}
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stMain"] [data-testid="stForm"] {
+  padding: var(--ht-card-pad);
+}
+
+/* 펼침 상자: 테두리를 가진 안쪽 상자(머리 + stExpanderDetails)를 카드로.
+ * :has()를 못 읽는 브라우저에서도 위 규칙이 버려지지 않도록 따로 둔다. */
+[data-testid="stMain"] [data-testid="stExpander"] > :has(> [data-testid="stExpanderDetails"]) {
+  background: var(--ht-card-bg);
+  border-color: var(--ht-card-border);
+  border-radius: var(--ht-card-radius);
+  box-shadow: var(--ht-card-shadow);
+}
+
+/* 카드 안의 카드(예: 펼침 상자 안의 폼, 카드 안의 지표)는 그림자 없이 평평하게 */
+[data-testid="stMain"] :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stExpander"])
+  :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stMetric"]) {
+  box-shadow: none;
+}
+[data-testid="stMain"] :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stExpander"])
+  [data-testid="stExpander"] > :has(> [data-testid="stExpanderDetails"]) {
+  box-shadow: none;
+}
+
+/* 지표 카드(st.metric) */
+[data-testid="stMain"] [data-testid="stMetric"] {
+  padding: 1rem 1.25rem;
+}
+[data-testid="stMetricLabel"] p {
+  font-weight: 600;
+  color: var(--ht-muted);
+}
+
+/* ---------------------------------------------------------------- 탭: 글자 + 강조색 밑줄 */
+[data-testid="stTab"] {
+  color: var(--ht-muted);
+  font-weight: 500;
+}
+[data-testid="stTab"][data-selected] {
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- 버튼 */
+:is([data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"],
+    [data-testid="stBaseButton-primaryFormSubmit"], [data-testid="stBaseButton-secondaryFormSubmit"]) {
+  min-height: 2.5rem;
+  padding-inline: 1rem;
+  font-weight: 600;
+}
+:is([data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"]):not(:disabled) {
+  box-shadow: 0 2px 6px rgba(50, 70, 211, 0.25);
+}
+
+/* ---------------------------------------------------------------- 사이드바 메뉴 */
+[data-testid="stSidebarNavLink"] {
+  border-radius: 10px;
+  padding-block: 0.5rem;
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+  background: var(--ht-accent-soft);
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] span {
+  color: var(--ht-accent);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- 마크다운 표(매물 비교표·적합도 순위) */
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] table {
+  background: var(--ht-card-bg);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ht-card-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] th {
+  background: #f7f8fc;
+  font-weight: 700;
+}

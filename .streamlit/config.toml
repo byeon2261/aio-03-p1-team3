@@ -9,7 +9,36 @@ gatherUsageStats = false
 # 처리되지 않은 예외는 종류만 보여 준다(스택·메시지에 입력 내용이 섞여 화면에 노출되는 것을 막음).
 # 로컬에서 자세히 보려면: STREAMLIT_CLIENT_SHOW_ERROR_DETAILS=full streamlit run frontend/app.py
 showErrorDetails = "type"
+# 오른쪽 위 메뉴에서 개발용 항목(Deploy·다시 실행·캐시 지우기)을 뺀다
+toolbarMode = "minimal"
 
 [server]
 # 업로드 위젯 한도(MB). 서버 MAX_PHOTO_MB 기본값 10과 맞춘다
 maxUploadSize = 10
+
+# 팀 테마(회색 배경 + 흰 카드). 카드 그림자·여백·탭·헤더는 frontend/core/theme.css가 맡는다.
+# 값과 이유는 docs/SCREEN_DESIGN.md 3절.
+[theme]
+base = "light"
+primaryColor = "#3246D3"              # 강조: 주 버튼·선택 탭 밑줄·링크
+backgroundColor = "#F4F6FB"           # 앱 배경(연회색). 카드는 흰색
+secondaryBackgroundColor = "#EEF2FB"  # 입력칸·선택 상자 바탕
+textColor = "#110D3C"
+borderColor = "#E3E8F2"
+blueColor = "#3246D3"                 # 안내 상자, 비교표 최저값
+greenColor = "#16A34A"                # 성공·분석 완료·예산 안
+redColor = "#E5484D"                  # 오류·분석 실패·예산 초과
+grayTextColor = "#64636D"             # 보조 글씨(:gray[…])
+# 한국어 웹폰트 Pretendard(jsDelivr). 못 불러오면 기본 sans-serif
+font = "Pretendard Variable:https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css, sans-serif"
+baseFontWeight = 400
+headingFontWeights = [800, 700, 700]  # h1 페이지 제목 · h2 · h3 소제목
+metricValueFontWeight = 800
+baseRadius = "0.625rem"               # 10px: 입력칸·상자
+buttonRadius = "0.5rem"               # 8px
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EEF2FB"
+textColor = "#110D3C"
+borderColor = "#E3E8F2"
