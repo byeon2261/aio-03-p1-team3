@@ -15,7 +15,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - 백엔드: `app/features/<이름>/router.py`의 `router`(APIRouter)를 이름순 등록. `hooks.py`는 import 시 등록 코드 실행(앱을 다시 만들면 다시 읽는다 → 등록 코드는 여러 번 돌아도 안전해야 함. R의 register_*·events.on은 같은 key·처리기를 바꿔 끼운다).
   - 기본 구현을 넣는 hooks는 이미 등록된 것이 있으면 덮지 않는다(P2 `analysis/hooks.py`: 파이프라인이 비어 있을 때만 Gemini 파이프라인 등록). 그래서 테스트에서 `register_pipeline(FakePipeline())`을 `client_as()` 앞에 불러도 유지된다.
 - 프론트: `frontend/features/<이름>/pages.py`의 `PAGES`, `sections.py`의 `SECTIONS`. import 시 st 함수를 부르지 않는다.
-  - PAGES 항목 `{"key","title","order","admin_only","render"}` (key는 `[a-z0-9_]`, URL 경로로 씀)
+  - PAGES 항목 `{"key","title","order","admin_only","render"}` (key는 `[a-z0-9_]`, URL 경로로 씀). 선택 `"hidden": True`면 사이드바 메뉴에 안 보이고 버튼(`nav`)으로만 간다
   - SECTIONS 항목 `{"slot","order","render(ctx)"}`
 - 의존성: 추가 패키지는 `backend/requirements/<단계>.txt`·`frontend/requirements/<단계>.txt`(버전 고정 `==`). `requirements.txt`는 `check_merge.py check`가 만든다.
 - 프론트 import 기준은 `frontend/`다: `from core.api import api_get`, `from features.sessions.x import y`.
@@ -191,7 +191,7 @@ CASCADE는 소유 사슬(→photos·session_budgets·eval_results·F12 테이블
 - `nav.py`: `go_sessions()`, `go_session_detail(sid)`, `go_listing_detail(lid)`, `go_page(key)`. on_click 콜백이 아닌 본문(`if st.button(...)`)에서 부른다.
 - `slots.py`: `render_slot(slot, ctx)`. `ui.py`: `fmt_manwon(v)`("미기재"/"500만원"), `fmt_kst(t)`, `show_api_error(e)`(코드별 문구+다음 할 일), `privacy_notice()`.
 - 슬롯: `session_detail`(ctx: session) → P1 매물 목록·새 메모 10(사진이 있는 매물 카드에 처음 올린 사진·+N, `GET /me/photos` 한 번으로 이 세션 것만 고름, 실패하면 사진 없이 표시. 매물 카드 오른쪽에 F13 `features.map.listing_map.render_session_map()` 매물 지도), P5 예산 20, F12 항목 가중치 25, P3 비교표 30, F12 적합도 순위 35. `listing_detail`(ctx: listing, session) → P1 메모 편집 10, P2 분석 20, P3 수정·피드백 30, P4 사진 40, F12 항목 만족도 45, F13 위치 50.
-- 페이지 order·key: P1 세션 목록 10 `sessions`, R 세션 상세 20 `session_detail`, R 매물 상세 30 `listing_detail`, F14 발품 후기 쓰기 60 `balpum_write`, F14 발품 후기 목록 65 `balpum_list`, F13 전체 매물 70 `map`(내 모든 세션의 위치 있는 매물을 사이드바 오른쪽 전체 지도에 핀으로, 왼쪽 위 매물 목록을 누르면 그 핀으로 이동, 핀 카드에서 매물 상세로 이동. 카카오 JavaScript 키: secrets·환경변수·`frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면 입력), P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필·내 발품 후기, 가중치 프로필 탭은 F12 `features.scoring.sections.render_profile_manager()`, 마지막 탭은 F14 `features.community.mypage_tab.render_my_posts()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
+- 페이지 order·key(사이드바 이름): P1 세션 목록 10 `sessions`('세션'), R 세션 상세 20 `session_detail`(사이드바에 안 보임, '← 세션'), R 매물 상세 30 `listing_detail`(사이드바에 안 보임, '← 세션 제목'), F14 발품 후기 쓰기 60 `balpum_write`(사이드바에 안 보임, 목록의 [발품 후기 쓰기]로 열고 '← 발품 후기'로 돌아감, 등록하면 목록으로 이동), F14 발품 후기 목록 65 `balpum_list`('발품 후기'), F13 전체 매물 70 `map`(내 모든 세션의 위치 있는 매물을 사이드바 오른쪽 전체 지도에 핀으로, 왼쪽 위 매물 목록을 누르면 그 핀으로 이동, 핀 카드에서 매물 상세로 이동. 카카오 JavaScript 키: secrets·환경변수·`frontend/.env`의 `KAKAO_JAVASCRIPT_KEY`, 없으면 화면 입력), P4 마이페이지 80 `mypage`(탭 내 정보·내 사진·요약·가중치 프로필·내 발품 후기, 가중치 프로필 탭은 F12 `features.scoring.sections.render_profile_manager()`, 마지막 탭은 F14 `features.community.mypage_tab.render_my_posts()`), P6 운영 대시보드 90 `admin_logs`(admin_only), P7 개선 전후 비교 95 `evals`(admin_only).
 - 이름 예약: 비교표 열 key `budget`, 행 필터 `within_budget`(P5 등록, P3 사용), 비교표 열 key `score`(F12, order 20). F12 순위 섹션은 `budget_filter_key(sid)`를 읽어 같은 필터로 `/scores`를 부른다.
 
 ## 7. 테스트

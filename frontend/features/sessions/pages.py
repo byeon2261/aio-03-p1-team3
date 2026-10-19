@@ -1,4 +1,4 @@
-"""F2 세션 목록 페이지 (key sessions, order 10)."""
+"""F2 세션 목록 페이지 (key sessions, order 10, 사이드바 이름 '세션')."""
 
 from __future__ import annotations
 
@@ -72,5 +72,5 @@ def render_sessions() -> None:
 
 
 PAGES = [
-    {"key": "sessions", "title": "세션 목록", "order": 10, "admin_only": False, "render": render_sessions},
+    {"key": "sessions", "title": "세션", "order": 10, "admin_only": False, "render": render_sessions},
 ]
