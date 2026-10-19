@@ -42,6 +42,7 @@ for m in (components, pages, mypage_tab):
 for m in (components, pages):
     m.api_post, m.api_patch = _write("POST"), _write("PATCH")
 components.api_delete = _write("DELETE")
+components.api_put = _write("PUT")
 from core import nav as _nav
 _nav.go_page = lambda key: fake.calls.append(("NAV", key, None))   # 화면 이동은 기록만
 st.session_state.setdefault("auth", {{"access_token": "t", "refresh_token": "r", "expires_at": None,
@@ -147,6 +148,56 @@ def test_community_detail_delete_with_confirm(ui_fake):
     assert not at.exception, at.exception
     assert ("DELETE", "/community/posts/p-mine", None) in ui_fake.calls
     assert any("후기를 지웠습니다" in s.value for s in at.success)
+
+
+# ------------------------------------------------------------------ 좋아요·정렬
+def test_community_like_helpers():
+    assert view.like_mark({"like_count": 8, "liked_by_me": True}) == "♥ 8"
+    assert view.like_mark({}) == "♡ 0"
+    assert view.like_button_label({"like_count": 2, "liked_by_me": False}) == "♡ 좋아요 2"
+    assert view.list_params({"address": "", "floor": view.ALL, "topic": view.ALL}, "좋아요 많은순") == {"sort": "likes"}
+    assert view.list_params({"address": "", "floor": view.ALL, "topic": view.ALL}, "최신순") == {}
+
+
+def test_community_list_shows_like_counts_and_sort(ui_fake):
+    ui_fake.responses["/community/posts"] = [{**OTHERS, "like_count": 8, "liked_by_me": True},
+                                             {**MINE, "like_count": 2}]
+    at = _app("pages.render_list()")
+    captions = [c.value for c in at.caption]
+    assert "♥ 8" in captions and "♡ 2" in captions
+    radio = at.radio(key="balpum_sort")
+    assert radio.options == ["최신순", "좋아요 많은순"] and radio.value == "최신순"
+    radio.set_value("좋아요 많은순").run()
+    assert not at.exception, at.exception
+    assert ui_fake.calls[-1] == ("GET", "/community/posts", {"sort": "likes"})
+    # 정렬만 바꾸면 '검색 결과 없음'이 아니라 '아직 후기가 없음' 안내
+    ui_fake.responses["/community/posts"] = []
+    at.run()
+    assert any("아직 등록된 후기가 없어요" in i.value for i in at.info)
+
+
+def test_community_detail_like_toggle(ui_fake):
+    at = _app("pages.render_list()")
+    at.button(key="balpum_open:list:p-other").click().run()
+    like = at.button(key="balpum_like:list:p-other")
+    assert like.label == "♡ 좋아요 0"
+    like.click().run()
+    assert not at.exception, at.exception
+    assert ("PUT", "/community/posts/p-other/like", None) in ui_fake.calls
+    ui_fake.responses["/community/posts/p-other"] = {**OTHERS, "body": "남의 본문", "photo": None,
+                                                     "like_count": 1, "liked_by_me": True}
+    at.run()
+    like = at.button(key="balpum_like:list:p-other")
+    assert like.label == "♥ 좋아요 1"
+    like.click().run()
+    assert ("DELETE", "/community/posts/p-other/like", None) in ui_fake.calls
+
+
+def test_community_detail_own_post_has_no_like_button(ui_fake):
+    at = _app("pages.render_list()")
+    at.button(key="balpum_open:list:p-mine").click().run()
+    assert not any(b.key and b.key.startswith("balpum_like:") for b in at.button)
+    assert any("내 글에는 누를 수 없어요" in c.value for c in at.caption)
 
 
 # ------------------------------------------------------------------ 쓰기

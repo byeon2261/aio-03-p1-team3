@@ -156,6 +156,7 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
    8. `supabase/migrations/0131_listing_locations.sql` (F13 내 매물 위치)
    9. `supabase/migrations/0132_drop_map_listings.sql` (F13 서울역 더미 매물 테이블 삭제, 없으면 아무 일도 안 함)
    10. `supabase/migrations/0140_community.sql` (F14 발품 후기)
+   11. `supabase/migrations/0141_community_likes.sql` (F14 발품 후기 좋아요)
 
    0004·0005는 비워 둔 번호다. 0120~은 F12, 0130~은 F13, 0140~은 F14가 쓴다.
 

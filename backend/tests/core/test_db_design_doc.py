@@ -34,7 +34,7 @@ LOGICAL_TO_PHYSICAL = {
     "WeightProfile": "weight_profiles", "WeightItem": "weight_items",
     "ListingSatisfaction": "listing_satisfactions", "SessionScoring": "session_scoring",
     "ListingLocation": "listing_locations", "CommunityPost": "community_posts",
-    "CommunityPostPhoto": "community_post_photos", "RequestLog": "request_logs", "EvalCase": "eval_cases",
+    "CommunityPostPhoto": "community_post_photos", "CommunityPostLike": "community_post_likes", "RequestLog": "request_logs", "EvalCase": "eval_cases",
     "EvalRun": "eval_runs", "EvalResult": "eval_results",
 }
 
