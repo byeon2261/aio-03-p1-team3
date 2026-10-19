@@ -92,7 +92,7 @@ def render_listing_location(ctx: dict) -> None:
                    "latitude": location["latitude"], "longitude": location["longitude"], "link": False}
             components.pins_map(api_key, [pin], key=f"map_loc_saved:{lid}", height=280)
     else:
-        st.info("아직 위치가 없습니다. 주소를 검색해 저장하면 세션 화면의 매물 지도에 표시됩니다.")
+        st.caption("아직 위치가 없습니다. 주소를 검색해 저장하면 세션 화면의 매물 지도에 표시됩니다.")
 
     if not api_key:
         st.caption(NO_KEY_NOTE)

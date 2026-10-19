@@ -62,7 +62,7 @@ def _previous_block(aid: str, lid: str, analysis: dict) -> None:
     if not pending:
         return
     names = ", ".join(EDIT_TITLES[k] for k in pending)
-    st.info(f"이전 분석에서 직접 고친 값이 있습니다({names}). 누르기 전에는 이번 분석에 들어가지 않습니다.")
+    st.caption(f"이전 분석에서 직접 고친 값이 있습니다({names}). 누르기 전에는 이번 분석에 들어가지 않습니다.")
     if st.button(f"이전 수정 {len(pending)}개 적용", key=_key(aid, "apply_prev")):
         body = {"corrections": [{"field_name": k, "action": "set", "corrected_value": v} for k, v in pending.items()]}
         if _post(aid, lid, body):
@@ -77,11 +77,11 @@ def render_feedback(ctx: dict) -> None:
     except ApiError as e:
         if e.status == 404:
             return  # 분석 전: 섹션 숨김
-        st.subheader("AI 결과 수정·피드백")
+        st.subheader("✏️ AI 결과 수정·피드백")
         show_api_error(e)
         return
 
-    st.subheader("AI 결과 수정·피드백")
+    st.subheader("✏️ AI 결과 수정·피드백")
     flash = st.session_state.pop(f"fb_flash:{lid}", None)
     if flash:
         st.success(flash)

@@ -11,5 +11,5 @@ from features.comparison.feedback_form import render_feedback
 
 SECTIONS = [
     {"slot": "session_detail", "order": 30, "render": render_comparison},
-    {"slot": "listing_detail", "order": 30, "render": render_feedback},
+    {"slot": "listing_detail", "order": 30, "area": "review", "render": render_feedback},   # '수정·평가' 탭
 ]

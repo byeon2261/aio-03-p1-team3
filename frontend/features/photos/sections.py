@@ -72,10 +72,10 @@ def render_photos(ctx: dict) -> None:
         return
 
     if not photos:
-        st.info("아직 올린 사진이 없습니다. 위에서 사진을 골라 올려 보세요.")
+        st.caption("아직 올린 사진이 없습니다. 위에서 사진을 골라 올려 보세요.")
         return
     st.caption(f"{len(photos)}장 · 미리보기 주소는 10분 동안만 열립니다. 오래 열어 뒀다면 새로 고침하세요.")
     photo_grid(photos, scope=listing_id)
 
 
-SECTIONS = [{"slot": "listing_detail", "order": 40, "render": render_photos}]
+SECTIONS = [{"slot": "listing_detail", "order": 40, "area": "media", "render": render_photos}]   # '사진·위치' 탭

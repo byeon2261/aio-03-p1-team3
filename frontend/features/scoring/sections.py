@@ -335,5 +335,5 @@ def render_satisfaction(ctx: dict) -> None:
 SECTIONS = [
     {"slot": "session_detail", "order": 25, "render": render_scoring_settings},
     {"slot": "session_detail", "order": 35, "render": render_ranking},
-    {"slot": "listing_detail", "order": 45, "render": render_satisfaction},
+    {"slot": "listing_detail", "order": 45, "area": "score", "render": render_satisfaction},   # '내 점수' 탭
 ]

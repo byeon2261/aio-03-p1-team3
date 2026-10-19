@@ -5,7 +5,8 @@
   ([AI로 정리하기])와 F13 매물 지도, 그 아래 '➕ 새 매물 메모 추가' 펼침 상자(매물이 없으면 펼친 상태).
 - session_detail (order 90): 페이지 맨 아래 '⚙️ 세션 관리' 펼침 상자(세션 제목·방문일 수정, 세션 삭제).
   요약 숫자·카드 숫자·예산 칩은 같은 화면의 비교표가 쓰는 GET /sessions/{id}/comparison 응답에서 만든다(summary.py).
-- listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
+- listing_detail (order 10): [⋯] 팝오버 안 [매물 삭제] → 같은 팝오버 안 삭제 확인(menu), 한 번짜리 안내(notice),
+  '메모' 탭의 메모 편집·저장(memo)
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
 from features.sessions import analyze_all, summary
-from features.sessions.common import flash, parse_date, show_flash, status_next_step, status_text
+from features.sessions.common import flash, parse_date, show_flash, status_next_step
 from features.sessions.memo_editor import render_memo_editor
 from features.map.listing_map import render_session_map
 
@@ -279,23 +280,34 @@ def render_session_manage(ctx: dict) -> None:
 
 
 # ------------------------------------------------------------------ listing_detail
-def _render_listing_delete(listing: dict, session: dict) -> None:
+# [삭제] 버튼만 빨간 글씨(테두리 버튼). 선택자는 st.button(key=…)이 붙이는 공식 CSS 클래스 st-key-<key>
+DELETE_BUTTON_CSS = """<style>
+[class*="st-key-p1_delete_listing_ok"] button { color: #E5484D; border-color: #F2B8BA; }
+[class*="st-key-p1_delete_listing_ok"] button:hover { color: #C93C40; border-color: #E5484D; background: #FDF0F0; }
+[class*="st-key-p1_delete_listing_ok"] button p { color: inherit; font-weight: 700; }
+</style>"""
+
+
+def render_listing_menu(ctx: dict) -> None:
+    """매물 상세 [⋯] 팝오버 안: [매물 삭제] → 같은 팝오버 안에 확인 문구 + [삭제]/[취소]. 흐름·key는 예전과 같다."""
+    listing, session = ctx["listing"], ctx["session"]
     lid = listing["id"]
     key = _confirm_key("listing", lid)
     if not st.session_state.get(key):
-        if st.button("매물 삭제", key=f"p1_delete_listing:{lid}"):
+        if st.button("매물 삭제", key=f"p1_delete_listing:{lid}", icon=":material/delete:", type="tertiary"):
             st.session_state[key] = True
             st.rerun()
         return
-    st.warning(f"{listing['label']}의 메모·분석·사진이 모두 삭제됩니다. "
-               "지운 번호는 다시 쓰지 않습니다. 되돌릴 수 없습니다.")
+    st.html(DELETE_BUTTON_CSS)
+    st.markdown(f"**{listing['label']}을(를) 삭제할까요?**")
+    st.caption("메모·분석·사진이 모두 삭제됩니다. 지운 번호는 다시 쓰지 않습니다. 되돌릴 수 없습니다.")
     ok_col, cancel_col = st.columns(2)
     with cancel_col:
         if st.button("취소", key=f"p1_delete_listing_cancel:{lid}", width="stretch"):
             st.session_state.pop(key, None)
             st.rerun()
     with ok_col:
-        confirmed = st.button("삭제", key=f"p1_delete_listing_ok:{lid}", type="primary", width="stretch")
+        confirmed = st.button("삭제", key=f"p1_delete_listing_ok:{lid}", width="stretch")
     if not confirmed:
         return
     try:
@@ -312,15 +324,15 @@ def _render_listing_delete(listing: dict, session: dict) -> None:
     nav.go_session_detail(session["id"])
 
 
-def render_listing_section(ctx: dict) -> None:
-    listing, session = ctx["listing"], ctx["session"]
-    lid = listing["id"]
+def render_listing_flash(ctx: dict) -> None:
+    """제목 아래(notice): 이 매물 화면에 남긴 한 번짜리 안내."""
     show_flash("listing_detail")
 
-    st.markdown(f"분석 상태: {status_text(listing)}")
-    hint = status_next_step(listing)
-    if hint:
-        st.caption(hint)
+
+def render_listing_memo(ctx: dict) -> None:
+    """매물 상세 '메모' 탭: 메모 편집·저장(분석 상태 문구는 제목 옆 칩으로 옮김)."""
+    listing = ctx["listing"]
+    lid = listing["id"]
 
     def save(text: str) -> str:
         updated = api_patch(f"/listings/{lid}", json={"memo_text": text})
@@ -331,11 +343,13 @@ def render_listing_section(ctx: dict) -> None:
     render_memo_editor(scope=f"listing:{lid}", draft_path=f"/listings/{lid}/draft",
                        initial_text=listing.get("memo_text") or "", label="메모 편집",
                        placeholder=MEMO_PLACEHOLDER, save_label="메모 저장", on_save=save)
-    _render_listing_delete(listing, session)
 
 
 SECTIONS = [
     {"slot": "session_detail", "order": 10, "render": render_session_section},
     {"slot": "session_detail", "order": 90, "render": render_session_manage},
-    {"slot": "listing_detail", "order": 10, "render": render_listing_section},
+    # 매물 상세: 자리(area)는 core/host_pages.py 참고. order는 check_merge 중복 점검 때문에 자리마다 다르게
+    {"slot": "listing_detail", "order": 10, "area": "menu", "render": render_listing_menu},
+    {"slot": "listing_detail", "order": 11, "area": "notice", "render": render_listing_flash},
+    {"slot": "listing_detail", "order": 12, "area": "memo", "render": render_listing_memo},
 ]
