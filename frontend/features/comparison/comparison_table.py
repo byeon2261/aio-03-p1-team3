@@ -11,6 +11,8 @@ from features.comparison.cells import (
     BUDGET_FILTER, COST_NOTE, comparison_markdown, hidden_message, needs_action,
 )
 
+TITLE_HELP = "💡 관리비가 비싸도 **포함 내역**이 많으면 더 쌀 수 있어요.  \n'미기재'는 집주인에게 꼭 물어보세요."
+
 
 def _action_hint(rows: list[dict]) -> None:
     todo = [r for r in rows if needs_action(r)]
@@ -27,7 +29,7 @@ def _action_hint(rows: list[dict]) -> None:
 def render_comparison(ctx: dict) -> None:
     session = ctx["session"]
     sid = session["id"]
-    st.subheader("매물 비교표")
+    st.subheader("매물 비교표", help=TITLE_HELP)
 
     filter_on = bool(st.session_state.get(state.budget_filter_key(sid)))
     params = {"filters": BUDGET_FILTER} if filter_on else None

@@ -33,6 +33,7 @@ def test_comparison_api_fields_order_and_values(client_as, make_user, memory_db)
     assert body["enough_listings"] is True and body["message"] is None
     assert [f["key"] for f in body["fields"]] == EXPECTED_FIELDS
     assert [f["title"] for f in body["fields"]][:4] == ["보증금", "월세", "관리비", "월 고정비"]
+    assert body["fields"][4] == {"key": "maintenance_includes", "title": "포함 내역"}
     row1 = body["rows"][0]
     assert row1["label"] == "1번 집" and row1["analysis_status"] == "success"
     assert list(row1["values"]) == EXPECTED_FIELDS          # 응답 values는 열 순서 그대로

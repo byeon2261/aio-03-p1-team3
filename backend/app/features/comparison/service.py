@@ -28,7 +28,7 @@ FIELDS: tuple[tuple[str, str], ...] = (
     ("monthly_rent_manwon", "월세"),
     ("maintenance_fee_manwon", "관리비"),
     ("monthly_cost_manwon", "월 고정비"),
-    ("maintenance_includes", "관리비 포함"),
+    ("maintenance_includes", "포함 내역"),     # 관리비에 들어 있는 항목(인터넷·수도 등). 화면 제목 옆 ?에 설명
     ("transit", "교통"),
     ("floor", "층수"),
     ("direction", "방향"),
