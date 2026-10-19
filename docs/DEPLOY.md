@@ -237,7 +237,7 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
    - Secrets: 아래 한 줄(4-1에서 복사한 서버 주소, 끝에 `/` 없이)
 
      ```toml
-     API_BASE_URL = "https://house-tour-notes-api.onrender.com"
+     API_BASE_URL = "https://house-tour-notes-api-6bb5.onrender.com"
      ```
 
      전체 매물·세션 매물 지도(F13)를 보이려면 카카오 앱의 **JavaScript 키**도 넣고, 카카오 개발자 콘솔의 Web 도메인에 Streamlit 배포 주소를 등록한다(없으면 화면에서 키를 입력하라는 안내가 나온다).
@@ -260,8 +260,8 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
 ### 6-1. `/ready`로 DB·Redis 연결 확인
 
 ```bash
-curl https://house-tour-notes-api.onrender.com/health   # 잠들어 있으면 1분쯤 걸린다 → {"status":"ok"}
-curl https://house-tour-notes-api.onrender.com/ready    # {"db":true,"redis":true}
+curl https://house-tour-notes-api-6bb5.onrender.com/health   # 잠들어 있으면 1분쯤 걸린다 → {"status":"ok"}
+curl https://house-tour-notes-api-6bb5.onrender.com/ready    # {"db":true,"redis":true}
 ```
 
 | 결과 | 뜻 | 할 일 |
@@ -275,7 +275,7 @@ curl https://house-tour-notes-api.onrender.com/ready    # {"db":true,"redis":tru
 
 ```bash
 # bash
-export API_BASE_URL="https://house-tour-notes-api.onrender.com"
+export API_BASE_URL="https://house-tour-notes-api-6bb5.onrender.com"
 export SMOKE_USER_EMAIL="user@example.com"   SMOKE_USER_PASSWORD="…"
 export SMOKE_ADMIN_EMAIL="admin@example.com" SMOKE_ADMIN_PASSWORD="…"
 python backend/scripts/smoke_test.py
@@ -283,7 +283,7 @@ python backend/scripts/smoke_test.py
 
 ```powershell
 # Windows PowerShell
-$env:API_BASE_URL = "https://house-tour-notes-api.onrender.com"
+$env:API_BASE_URL = "https://house-tour-notes-api-6bb5.onrender.com"
 $env:SMOKE_USER_EMAIL = "user@example.com";   $env:SMOKE_USER_PASSWORD = "…"
 $env:SMOKE_ADMIN_EMAIL = "admin@example.com"; $env:SMOKE_ADMIN_PASSWORD = "…"
 python backend/scripts/smoke_test.py

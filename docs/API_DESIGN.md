@@ -29,7 +29,7 @@ FastAPI 서버(`backend/`)가 제공하는 HTTP API의 설계 문서입니다. �
 
 | 항목 | 내용 |
 |---|---|
-| 기본 URL(배포) | `https://house-tour-notes-api.onrender.com` (무료 서버라 잠들어 있으면 첫 요청이 최대 1분) |
+| 기본 URL(배포) | `https://house-tour-notes-api-6bb5.onrender.com` (무료 서버라 잠들어 있으면 첫 요청이 최대 1분) |
 | 기본 URL(로컬) | `http://localhost:8000` (`backend` 폴더에서 `uvicorn app.main:app`) |
 | 자동 문서 | `/docs`(Swagger UI), `/openapi.json` — FastAPI가 코드에서 만든다. 오류 응답 형식은 9절 D10 참고 |
 | 인증 | `Authorization: Bearer <access_token>`. 토큰은 `/auth/login`·`/auth/signup`·`/auth/refresh`가 주는 Supabase 액세스 토큰 |
