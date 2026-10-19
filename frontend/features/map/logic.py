@@ -99,11 +99,12 @@ def location_body(geocoded: dict) -> dict:
 
 
 def my_pins(pins: list[dict]) -> list[dict]:
-    """GET /me/locations의 pins → 핀 지도 데이터. 카드 주소 줄 앞에 세션 이름을 붙인다."""
+    """GET /me/locations의 pins → 핀 지도 데이터. 핀 이름표 위 줄과 카드 주소 줄 앞에 세션 이름을 붙인다."""
     out = session_pins(pins)
     for pin, src in zip(out, pins):
         title = (src.get("session_title") or "").strip()
         if title:
+            pin["group"] = title
             pin["detail"] = f"{title} · {pin['detail']}" if pin["detail"] else title
     return out
 
