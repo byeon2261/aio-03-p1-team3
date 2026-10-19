@@ -14,13 +14,6 @@ ADDRESS_MAX = 200
 PRIVACY_NOTICE = ("연락처·실명은 적지 마세요. 단독·다가구 주택은 주소만으로 사는 사람이 특정될 수 있으니 "
                   "사진과 내용을 한 번 더 확인해 주세요.")
 
-# 목록 정렬: 화면 라벨 → GET /community/posts?sort=
-SORTS: dict[str, str] = {"최신순": "latest", "좋아요 많은순": "likes"}
-DEFAULT_SORT = "최신순"
-OWN_POST_LIKE_NOTE = "내 글에는 누를 수 없어요"
-LIKE_HELP = "도움이 됐다면 눌러 주세요"
-UNLIKE_HELP = "다시 누르면 취소돼요"
-
 # 422 detail.reason → 안내 문구
 REASONS = {
     "contact_info": None,   # 서버 문구를 그대로 쓴다(제목/내용 중 어디인지 알려 준다)
@@ -48,21 +41,9 @@ def meta_line(post: dict) -> str:
                        post.get("nickname", ""), visit_text])
 
 
-def like_mark(post: dict) -> str:
-    """'♥ 8'(내가 누름) / '♡ 2'(안 누름)."""
-    return f"{'♥' if post.get('liked_by_me') else '♡'} {int(post.get('like_count') or 0)}"
-
-
-def like_button_label(post: dict) -> str:
-    return f"{'♥' if post.get('liked_by_me') else '♡'} 좋아요 {int(post.get('like_count') or 0)}"
-
-
-def list_params(filters: dict, sort_label: str = DEFAULT_SORT) -> dict:
-    """화면 필터 → GET /community/posts 쿼리. '전체'와 빈 값, 기본 정렬(최신순)은 보내지 않는다."""
+def list_params(filters: dict) -> dict:
+    """화면 필터 → GET /community/posts 쿼리. '전체'와 빈 값은 보내지 않는다."""
     params: dict = {}
-    sort = SORTS.get(sort_label, "latest")
-    if sort != "latest":
-        params["sort"] = sort
     address = (filters.get("address") or "").strip()
     if address:
         params["address"] = address

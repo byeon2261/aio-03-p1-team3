@@ -8,12 +8,11 @@ import datetime as dt
 
 import streamlit as st
 
-from core.api import ApiError, api_delete, api_get, api_patch, api_post, api_put
+from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
 from features.community.view import (
     BODY_MAX, FLOOR_OPTIONS, PHOTO_EXTS, REASONS, TITLE_MAX, TOPICS, ADDRESS_MAX, PRIVACY_NOTICE,
-    DEFAULT_SORT, LIKE_HELP, OWN_POST_LIKE_NOTE, SORTS, UNLIKE_HELP,
-    fmt_floor_option, like_button_label, like_mark, meta_line,
+    fmt_floor_option, meta_line,
 )
 
 OPEN_KEY = "balpum_open:{scope}"        # 상세로 연 후기 id
@@ -73,7 +72,6 @@ def post_card(post: dict, scope: str) -> None:
         c1, c2 = st.columns([5, 1], vertical_alignment="center")
         c1.markdown(f"**{title}**" + ("  `내 글`" if post.get("is_mine") else ""))
         c1.caption(meta_line(post))
-        c1.caption(like_mark(post))
         if c2.button("자세히", key=f"balpum_open:{scope}:{post['id']}", width="stretch"):
             open_post(scope, post["id"])
             st.rerun()
@@ -177,7 +175,6 @@ def render_post_detail(post_id: str, scope: str) -> None:
         elif photo:
             st.caption("사진을 불러오지 못했습니다. 잠시 후 새로 고쳐 주세요.")
         st.write(post["body"])
-        _like_controls(post, scope)
 
     if not post.get("is_mine"):
         return
@@ -194,37 +191,10 @@ def render_post_detail(post_id: str, scope: str) -> None:
         _delete_controls(post, scope)
 
 
-def _like_controls(post: dict, scope: str) -> None:
-    """상세 본문 아래 좋아요. 내 글은 수만 보여 주고, 남의 글은 누르기·취소."""
-    if post.get("is_mine"):
-        st.caption(f"♥ 좋아요 {int(post.get('like_count') or 0)} · {OWN_POST_LIKE_NOTE}")
-        return
-    liked = bool(post.get("liked_by_me"))
-    c1, c2 = st.columns([1, 3], vertical_alignment="center")
-    clicked = c1.button(like_button_label(post), key=f"balpum_like:{scope}:{post['id']}", width="stretch")
-    c2.caption(UNLIKE_HELP if liked else LIKE_HELP)
-    if not clicked:
-        return
-    path = f"/community/posts/{post['id']}/like"
-    try:
-        api_delete(path) if liked else api_put(path)
-    except ApiError as e:
-        show_error(e)
-        return
-    st.rerun()
-
-
-def render_post_list(posts: list[dict], scope: str, empty_message: str, *, sort_key: str | None = None) -> None:
-    """sort_key를 주면 '후기 N개' 옆에 [최신순 / 좋아요 많은순]을 보여 준다(값은 그 key의 session_state)."""
+def render_post_list(posts: list[dict], scope: str, empty_message: str) -> None:
     if not posts:
         st.info(empty_message)
         return
-    if sort_key is None:
-        st.caption(f"후기 {len(posts)}개 · 최신순")
-    else:
-        c1, c2 = st.columns([1, 3], vertical_alignment="center")
-        c1.caption(f"후기 {len(posts)}개")
-        st.session_state.setdefault(sort_key, DEFAULT_SORT)
-        c2.radio("정렬", list(SORTS), key=sort_key, horizontal=True, label_visibility="collapsed")
+    st.caption(f"후기 {len(posts)}개 · 최신순")
     for p in posts:
         post_card(p, scope)

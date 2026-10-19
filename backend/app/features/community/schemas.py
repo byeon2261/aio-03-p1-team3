@@ -2,14 +2,11 @@
 
 - 필수: address(지번 주소), topic, title, body / 선택: floor, visit_date (사진은 따로 올린다)
 - 응답에는 작성자 id·이메일을 넣지 않는다. 닉네임과 is_mine(내 글 여부)만 준다.
-- 좋아요(0141): 응답에는 like_count(좋아요 수)와 liked_by_me(내가 눌렀는지)만 준다. 누른 사람은 내보내지 않는다.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-
-from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -18,7 +15,6 @@ ADDRESS_MAX = 200
 TITLE_MAX = 100
 BODY_MAX = 3000
 FLOOR_MIN, FLOOR_MAX = -10, 200
-PostSort = Literal["latest", "likes"]   # 최신순 · 좋아요 많은순(같으면 최신순)
 
 
 def _strip_required(v: str) -> str:
@@ -105,8 +101,6 @@ class PostSummaryOut(BaseModel):
     nickname: str
     is_mine: bool
     has_photo: bool
-    like_count: int = 0
-    liked_by_me: bool = False
     created_at: dt.datetime
     updated_at: dt.datetime
 
@@ -114,12 +108,6 @@ class PostSummaryOut(BaseModel):
 class PostOut(PostSummaryOut):
     body: str
     photo: PostPhotoOut | None = None
-
-
-class PostLikeOut(BaseModel):
-    post_id: str
-    like_count: int
-    liked_by_me: bool
 
 
 class TopicsOut(BaseModel):

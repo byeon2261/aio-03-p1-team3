@@ -1,7 +1,7 @@
 # 데이터베이스 설계서 (DB_DESIGN)
 
 집 보기 메모 비교 서비스의 데이터베이스 설계서입니다. 실제 마이그레이션(`supabase/migrations/*.sql`)과 서버 코드(`backend/app/`)를 읽고 그 내용대로 썼습니다.
-기준: `main` 2026-10-19 (PR #34까지 병합 뒤, 마이그레이션 `0001`~`0141`). DB를 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
+기준: `main` 2026-10-19 (PR #34까지 병합 뒤, 마이그레이션 `0001`~`0140`). DB를 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
 
 - DBMS: PostgreSQL (Supabase). 모든 테이블은 `public` 스키마에 있고, 로그인 계정은 Supabase가 관리하는 `auth.users`를 씁니다.
 - 접근 경로: 서버(FastAPI)가 **사용자 토큰**(`authenticated` 역할, RLS 적용)과 **secret key**(`service_role`, 운영·관리 작업)로 접근합니다. 화면(Streamlit)은 DB에 직접 붙지 않습니다.
@@ -33,14 +33,14 @@
 | 예산 | `session_budgets` | F11 세션 예산 | `0007_budget.sql` |
 | 항목 가중치 | `weight_profiles`, `weight_items`, `listing_satisfactions`, `session_scoring` | F12 적합도 점수 | `0120_scoring.sql` |
 | 매물 위치 | `listing_locations` | F13 내 매물 위치·지도 | `0131_listing_locations.sql` |
-| 발품 후기 | `community_posts`, `community_post_photos`, `community_post_likes` | F14 커뮤니티 후기·좋아요 | `0140_community.sql`, `0141_community_likes.sql` |
+| 발품 후기 | `community_posts`, `community_post_photos` | F14 커뮤니티 후기 | `0140_community.sql` |
 | 운영(관리자 전용) | `request_logs`, `eval_cases`, `eval_runs`, `eval_results` | F8 실시간 로그, F9 개선 전후 평가 | `0002_ops.sql` |
 
-권한·RLS는 `0003_rls.sql`과 각 기능 파일 끝에 있습니다. `0004`·`0005`는 예약 번호(파일 없음)이고, `0130_map_listings.sql`(서울역 더미 매물)은 저장소에서 빠졌으며 `0132_drop_map_listings.sql`이 이미 만든 테이블을 지웁니다. 따라서 최종 스키마의 `public` 테이블은 **19개**입니다(외부 `auth.users` 제외).
+권한·RLS는 `0003_rls.sql`과 각 기능 파일 끝에 있습니다. `0004`·`0005`는 예약 번호(파일 없음)이고, `0130_map_listings.sql`(서울역 더미 매물)은 저장소에서 빠졌으며 `0132_drop_map_listings.sql`이 이미 만든 테이블을 지웁니다. 따라서 최종 스키마의 `public` 테이블은 **18개**입니다(외부 `auth.users` 제외).
 
 ### 1.2 실행 순서
 
-`0001` → `0002` → `0003` → `0006` → `0007` → `0008` → `0120` → `0131` → `0132` → `0140` → `0141`. 모든 파일은 `if not exists`·`drop … if exists`로 써서 여러 번 실행해도 안전합니다. 배포 DB에는 **서버를 배포하기 전에** 실행합니다(`docs/DEPLOY.md` 2단계).
+`0001` → `0002` → `0003` → `0006` → `0007` → `0008` → `0120` → `0131` → `0132` → `0140`. 모든 파일은 `if not exists`·`drop … if exists`로 써서 여러 번 실행해도 안전합니다. 배포 DB에는 **서버를 배포하기 전에** 실행합니다(`docs/DEPLOY.md` 2단계).
 
 ### 1.3 공통 설계 규칙
 
@@ -89,8 +89,6 @@ erDiagram
     User ||--o{ CommunityPost : "쓴다"
     CommunityPost ||--o| CommunityPostPhoto : "사진 1장"
     User ||--o{ CommunityPostPhoto : "올린다"
-    CommunityPost ||--o{ CommunityPostLike : "좋아요를 받는다"
-    User ||--o{ CommunityPostLike : "누른다"
     User |o--o{ RequestLog : "요청한다"
     EvalRun ||--o{ EvalResult : "결과를 가진다"
     EvalCase ||--o{ EvalResult : "채점된다"
@@ -204,10 +202,6 @@ erDiagram
         int size_bytes "크기"
         datetime created_at "올린 시각"
     }
-    CommunityPostLike {
-        UUID id PK "좋아요"
-        datetime created_at "누른 시각"
-    }
     RequestLog {
         bigint id PK "요청 로그"
         UUID request_id "요청 ID"
@@ -273,7 +267,6 @@ erDiagram
 | ListingLocation | 매물의 주소·좌표 | (매물) | 약한 엔티티 |
 | CommunityPost | 지번 주소별 발품 후기 | id | 개인 매물과 연결하지 않는다 |
 | CommunityPostPhoto | 후기 사진 | id (자연 키: 후기) | 후기당 1장 |
-| CommunityPostLike | 후기에 누른 좋아요 1개 | id (자연 키: 후기 + 누른 사람) | 한 사람이 한 후기에 1번. 내 후기에는 못 누른다 |
 | RequestLog | API 요청 1건의 로그 | id | 운영자만 본다 |
 | EvalCase | 평가용 메모와 정답 | id (자연 키: case_key) | |
 | EvalRun | 같은 기준으로 돌린 평가 1회 | id | 개선 전후 비교 단위 |
@@ -303,8 +296,6 @@ erDiagram
 | User | CommunityPost | 1 : 0..N | 후기 작성 | `community_posts.profile_id` (CASCADE) |
 | CommunityPost | CommunityPostPhoto | 1 : 0..1 | 후기 사진 1장 | `community_post_photos.post_id` UNIQUE (CASCADE) |
 | User | CommunityPostPhoto | 1 : 0..N | 올린 사람 | `community_post_photos.profile_id` (CASCADE) |
-| CommunityPost | CommunityPostLike | 1 : 0..N | 후기가 받은 좋아요 | `community_post_likes.post_id` (CASCADE), UNIQUE(`post_id`, `profile_id`) |
-| User | CommunityPostLike | 1 : 0..N | 누른 사람 | `community_post_likes.profile_id` (CASCADE) |
 | User | RequestLog | 0..1 : 0..N | 요청한 사용자(로그인 전 요청은 사용자 없음) | `request_logs.profile_id` NULL 허용 (SET NULL) |
 | EvalRun | EvalResult | 1 : 0..N | 실행의 결과 | `eval_results.run_id` (CASCADE) |
 | EvalCase | EvalResult | 1 : 0..N | 케이스의 결과 | `eval_results.case_id` (CASCADE) |
@@ -335,8 +326,6 @@ erDiagram
     profiles ||--o{ community_posts : "profile_id"
     community_posts ||--o| community_post_photos : "post_id"
     profiles ||--o{ community_post_photos : "profile_id"
-    community_posts ||--o{ community_post_likes : "post_id"
-    profiles ||--o{ community_post_likes : "profile_id"
     profiles |o--o{ request_logs : "profile_id"
     eval_runs ||--o{ eval_results : "run_id"
     eval_cases ||--o{ eval_results : "case_id"
@@ -468,12 +457,6 @@ erDiagram
         integer size_bytes "NOT NULL CHECK 1~5242880"
         timestamptz created_at "NOT NULL DEFAULT now()"
     }
-    community_post_likes {
-        uuid id PK
-        uuid post_id FK "NOT NULL, UK(post_id, profile_id)"
-        uuid profile_id FK "NOT NULL, IDX"
-        timestamptz created_at "NOT NULL DEFAULT now()"
-    }
     request_logs {
         bigint id PK "GENERATED ALWAYS AS IDENTITY"
         uuid request_id "NOT NULL"
@@ -541,11 +524,10 @@ erDiagram
 | 12 | `listing_locations` | 매물 위치 | `listing_id` | 매물당 최대 1행 |
 | 13 | `community_posts` | 발품 후기 | `id` | 후기 쓰기 |
 | 14 | `community_post_photos` | 후기 사진 | `id` | 후기당 최대 1행 |
-| 15 | `community_post_likes` | 후기 좋아요 | `id` | 좋아요 누르기(취소하면 행 삭제) |
-| 16 | `request_logs` | 요청 로그 | `id` | API 요청 1회 |
-| 17 | `eval_cases` | 평가 케이스 | `id` | 케이스 등록 |
-| 18 | `eval_runs` | 평가 실행 | `id` | 평가 실행 1회 |
-| 19 | `eval_results` | 케이스별 평가 결과 | `id` | 실행 × 케이스 |
+| 15 | `request_logs` | 요청 로그 | `id` | API 요청 1회 |
+| 16 | `eval_cases` | 평가 케이스 | `id` | 케이스 등록 |
+| 17 | `eval_runs` | 평가 실행 | `id` | 평가 실행 1회 |
+| 18 | `eval_results` | 케이스별 평가 결과 | `id` | 실행 × 케이스 |
 | (외부) | `auth.users` | 인증 계정 | `id` | Supabase Auth 관리 |
 
 ---
@@ -569,14 +551,13 @@ erDiagram
 | ListingLocation | `listing_locations` | (매물) → `listing_id` PK·FK | ✅ |
 | CommunityPost | `community_posts` | id → `id` | ✅ |
 | CommunityPostPhoto | `community_post_photos` | id → `id` (+ `post_id` UNIQUE로 1:0..1) | ✅ |
-| CommunityPostLike | `community_post_likes` | id → `id` (+ 자연 키 UNIQUE(`post_id`, `profile_id`)) | ✅ |
 | RequestLog | `request_logs` | id → `id` | ✅ |
 | EvalCase | `eval_cases` | id → `id` (+ `case_key` UNIQUE) | ✅ |
 | EvalRun | `eval_runs` | id → `id` | ✅ |
 | EvalResult | `eval_results` | id → `id` | ✅ |
 
-- **엔티티 수**: 논리 20개(외부 1개 포함) = 물리 테이블 19개 + `auth.users` 1개.
-- **관계 수**: 2.2절의 관계 23개가 물리 ERD의 관계선 23개, 그리고 마이그레이션의 `references` 23개와 하나씩 대응합니다(5절 각 표의 FK 칸).
+- **엔티티 수**: 논리 19개(외부 1개 포함) = 물리 테이블 18개 + `auth.users` 1개.
+- **관계 수**: 2.2절의 관계 21개가 물리 ERD의 관계선 21개, 그리고 마이그레이션의 `references` 21개와 하나씩 대응합니다(5절 각 표의 FK 칸).
 - **속성**: 논리 엔티티의 속성은 물리 테이블에서 FK 컬럼을 뺀 컬럼과 이름이 같습니다. 1:1 확장 엔티티(SessionBudget·SessionScoring·ListingLocation)는 부모 식별자를 PK로 그대로 씁니다.
 - **카디널리티**: 1:0..1은 자식 FK가 PK이거나 UNIQUE인 경우(`session_budgets`, `session_scoring`, `listing_locations`, `community_post_photos.post_id`, `profiles.auth_user_id`)이고, 0..1 쪽 부모(선택 관계)는 FK가 NULL을 허용하는 경우(`session_scoring.weight_profile_id`, `request_logs.profile_id`)입니다.
 
@@ -763,18 +744,7 @@ erDiagram
 | `size_bytes` | integer | 1~5,242,880 | NOT NULL | — | CHECK `size_bytes between 1 and 5242880` | 파일 크기(1바이트~5MB) |
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 올린 시각(UTC) |
 
-### 5.15 `community_post_likes` — 후기 좋아요 (DB 코멘트 있음)
-
-| 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
-|---|---|---|---|---|---|---|
-| `id` | uuid | — | NOT NULL | `gen_random_uuid()` | PK | 좋아요 ID |
-| `post_id` | uuid | — | NOT NULL | — | FK → `community_posts.id` (CASCADE), UK(`post_id`, `profile_id`) | 후기(community_posts.id). 후기 삭제 시 함께 삭제 |
-| `profile_id` | uuid | — | NOT NULL | — | FK → `profiles.id` (CASCADE), IDX `community_post_likes_profile_id_idx` | 누른 사용자(profiles.id). 응답에는 내보내지 않고 수와 내가 눌렀는지만 준다 |
-| `created_at` | timestamptz | — | NOT NULL | `now()` | — | 누른 시각(UTC) |
-
-내 후기에는 누를 수 없다: 서버가 403 `FORBIDDEN`으로 막고 [API], INSERT 정책도 후기 작성자 ≠ 현재 사용자인지 확인한다 [DB].
-
-### 5.16 `request_logs` — 요청 로그 (운영)
+### 5.15 `request_logs` — 요청 로그 (운영)
 
 요청마다 한 행. 메모 원문·토큰·비밀번호는 남기지 않는다. secret key로만 읽고 쓴다.
 
@@ -793,7 +763,7 @@ erDiagram
 | `cache_hit` | boolean | — | NULL | — | — | 분석 캐시 사용 여부. 분석 요청이 아니면 null |
 | `created_at` | timestamptz | — | NOT NULL | `now()` | IDX `request_logs_created_at_idx` | 요청 시각(UTC). 기간 조회·최신순 정렬 |
 
-### 5.17 `eval_cases` — 평가 케이스 (운영)
+### 5.16 `eval_cases` — 평가 케이스 (운영)
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -803,7 +773,7 @@ erDiagram
 | `expected_json` | jsonb | — | NOT NULL | — | — | 정답 결과. `_criteria` 키에 채점 기준 글 |
 | `tags` | text[] | — | NOT NULL | `'{}'` | — | 분류 태그(예: `money_idiom` 금액 관용 표현, `negation` 부정 표현) |
 
-### 5.18 `eval_runs` — 평가 실행 (운영)
+### 5.17 `eval_runs` — 평가 실행 (운영)
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -822,7 +792,7 @@ erDiagram
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 시작 시각(UTC) |
 | `finished_at` | timestamptz | — | NULL | — | — | 끝난 시각(UTC). 실행 중이면 null |
 
-### 5.19 `eval_results` — 케이스별 평가 결과 (운영)
+### 5.18 `eval_results` — 케이스별 평가 결과 (운영)
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -861,7 +831,6 @@ erDiagram
 | `listings (session_id, listing_no)` | 같은 세션에 "1번 집"이 둘 생기지 않게 한다. 이 인덱스가 `session_id` 조회 인덱스도 겸한다 |
 | `photos.storage_path`, `community_post_photos.storage_path` | 파일 하나를 두 행이 가리키면 한쪽을 지울 때 다른 쪽 파일이 사라진다 |
 | `community_post_photos.post_id` | 후기당 사진 1장 규칙을 DB에서 보장한다 |
-| `community_post_likes (post_id, profile_id)` | 한 사람이 한 후기에 좋아요를 두 번 누를 수 없게 한다. 이 인덱스가 `post_id` 조회(좋아요 수)도 겸한다 |
 | `eval_cases.case_key` | 케이스 파일을 다시 불러올 때 같은 케이스를 찾아 갱신한다(중복 등록 방지) |
 | 복합 PK `weight_items`, `listing_satisfactions` | 같은 프로필·매물에 같은 항목이 두 번 들어가지 않게 한다 |
 
@@ -907,7 +876,6 @@ PostgreSQL은 PK·UNIQUE에 인덱스를 자동으로 만들지만, FK에는 만
 | `community_posts_profile_id_idx` | `community_posts(profile_id, created_at desc)` | 마이페이지 내 후기 최신순 |
 | `community_posts_address_key_idx` | `community_posts(address_key)` | 주소 키로 같은 주소 후기 찾기 |
 | `community_post_photos_profile_id_idx` | `community_post_photos(profile_id)` | 사용자 삭제 시 CASCADE |
-| `community_post_likes_profile_id_idx` | `community_post_likes(profile_id)` | 내가 누른 좋아요 찾기, 사용자 삭제 시 CASCADE |
 | `request_logs_created_at_idx` | `request_logs(created_at)` | 대시보드 기간 조회·최신순, 놓친 로그 재조회 |
 | `eval_results_run_id_idx`, `eval_results_case_id_idx` | `eval_results` | 실행별 결과, 케이스별 개선 전후 비교 |
 
@@ -992,7 +960,6 @@ PostgreSQL은 PK·UNIQUE에 인덱스를 자동으로 만들지만, FK에는 만
 | `listing_locations` | SELECT·INSERT·UPDATE·DELETE | 매물 → 세션 소유자 |
 | `community_posts` | SELECT·INSERT·UPDATE·DELETE | 읽기는 로그인 사용자 모두, 쓰기·고치기·지우기는 작성자 |
 | `community_post_photos` | SELECT·INSERT·DELETE | 읽기는 로그인 사용자 모두, 올리기는 후기 작성자, 지우기는 올린 사람 |
-| `community_post_likes` | SELECT·INSERT·DELETE | 읽기는 로그인 사용자 모두(좋아요 수), 누르기는 본인 이름으로 남의 후기에만, 취소는 본인 것만 |
 | `request_logs`, `eval_*` | 없음 | 정책 없음 → secret key 전용 |
 
 ### 8.3 Storage(`listing-photos` 비공개 버킷)
@@ -1021,5 +988,5 @@ PostgreSQL은 PK·UNIQUE에 인덱스를 자동으로 만들지만, FK에는 만
 
 - 새 마이그레이션을 더하는 PR은 이 문서의 1.1·1.2절, ERD(2·3절), 테이블 명세(5절), 제약 이유(6절)를 같은 PR에서 고칩니다.
 - 기존 마이그레이션 파일은 고치지 않고 새 번호 파일로 바꿉니다(`CLAUDE.md` 3절). 이 문서는 모든 마이그레이션을 실행한 **최종 상태**를 적습니다.
-- 컬럼 코멘트: `0008`·`0120`·`0131`·`0140`·`0141`은 DB에 이미 있습니다. 나머지 테이블의 코멘트는 이 문서의 5절을 기준으로 Issue #6(`0009_comments.sql`)에서 `COMMENT ON`으로 반영합니다.
+- 컬럼 코멘트: `0008`·`0120`·`0131`·`0140`은 DB에 이미 있습니다. 나머지 테이블의 코멘트는 이 문서의 5절을 기준으로 Issue #6(`0009_comments.sql`)에서 `COMMENT ON`으로 반영합니다.
 - 테이블별 쓰기 담당과 API는 `docs/CONTRACT.md` 5절, 화면 흐름은 `docs/SCREEN_DESIGN.md`, 엔드포인트는 `docs/API_DESIGN.md`를 봅니다.

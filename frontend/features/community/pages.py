@@ -17,7 +17,7 @@ from features.community.components import (
     opened_post, render_post_detail, render_post_list, set_flash, show_error, show_flash, upload_photo,
 )
 from features.community.view import (
-    ADDRESS_MAX, ALL, BODY_MAX, DEFAULT_SORT, FLOOR_OPTIONS, PHOTO_EXTS, PRIVACY_NOTICE, TITLE_MAX, TOPICS,
+    ADDRESS_MAX, ALL, BODY_MAX, FLOOR_OPTIONS, PHOTO_EXTS, PRIVACY_NOTICE, TITLE_MAX, TOPICS,
     fmt_floor_option, form_problems, list_params,
 )
 
@@ -27,7 +27,6 @@ _W = "balpum_w_"                 # 쓰기 칸 key 앞부분
 WRITE_KEYS = ["address", "topic", "floor", "visit", "title", "body", "photo", "agree"]
 _CLEAR_FLAG = "balpum_w_clear"
 FILTER_KEY = "balpum_filters"
-SORT_KEY = "balpum_sort"
 
 
 # ------------------------------------------------------------------ 쓰기
@@ -135,7 +134,7 @@ def render_list() -> None:
     st.caption("집 보러 가기 전, 같은 주소·층의 후기로 확인할 것을 준비하세요.")
 
     _search_bar()
-    params = list_params(_filters(), st.session_state.get(SORT_KEY, DEFAULT_SORT))
+    params = list_params(_filters())
     try:
         with st.spinner("후기를 불러오는 중…"):
             posts = api_get("/community/posts", params=params)
@@ -144,10 +143,9 @@ def render_list() -> None:
         if st.button("다시 시도", key="balpum_list_retry"):
             st.rerun()
         return
-    searched = {k: v for k, v in params.items() if k != "sort"}
-    empty = ("이 조건에 맞는 후기가 아직 없어요. 처음으로 써 보세요." if searched
+    empty = ("이 조건에 맞는 후기가 아직 없어요. 처음으로 써 보세요." if params
              else "아직 등록된 후기가 없어요. 처음으로 써 보세요.")
-    render_post_list(posts, LIST_SCOPE, empty, sort_key=SORT_KEY)
+    render_post_list(posts, LIST_SCOPE, empty)
 
 
 PAGES = [

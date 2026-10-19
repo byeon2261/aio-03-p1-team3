@@ -1,10 +1,9 @@
 """F14 발품 후기 저장·조회.
 
-테이블(0140): community_posts, community_post_photos. (0141): community_post_likes.
+테이블(0140): community_posts, community_post_photos.
 - 읽기는 로그인한 사용자 모두(RLS), 쓰기·고치기·지우기는 작성자만. 남의 글을 고치거나 지우려 하면 403.
 - 작성자 닉네임은 profiles가 본인 행만 읽히므로 admin db(secret key)로 닉네임만 읽는다.
 - 주소 검색은 부분 일치라 DB 필터 대신 최근 글을 읽어 서버에서 거른다(SEARCH_SCAN 개까지).
-- 좋아요는 남의 글에만, 한 사람이 한 글에 1번. 좋아요 많은순은 최근 글(SEARCH_SCAN 개)을 읽어 서버에서 정렬한다.
 - 사진 파일은 Storage "{auth_user_id}/community/{post_id}/{photo_id}.{ext}". 응답에는 서명 URL만 준다.
 """
 
@@ -15,21 +14,18 @@ import logging
 from typing import Any
 
 from app.core.config import settings
-from app.core.db import UniqueViolation, is_valid_uuid
+from app.core.db import is_valid_uuid
 from app.core.errors import AppError
 from app.core.storage import Storage, StorageError
 from app.features.community.address import address_key, address_matches, normalize_address
 from app.features.community.privacy import contact_reason
-from app.features.community.schemas import (
-    PostIn, PostLikeOut, PostOut, PostPhotoOut, PostSummaryOut, PostUpdateIn,
-)
+from app.features.community.schemas import PostIn, PostOut, PostPhotoOut, PostSummaryOut, PostUpdateIn
 from app.features.photos.service import sniff_content_type
 
 logger = logging.getLogger("app.features.community")
 
 POSTS = "community_posts"
 PHOTOS = "community_post_photos"
-LIKES = "community_post_likes"
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 SEARCH_SCAN = 1000                      # 주소 검색 때 서버에서 훑는 최근 글 수
@@ -48,10 +44,6 @@ def post_not_found() -> AppError:
 
 def not_author() -> AppError:
     return AppError(403, "FORBIDDEN", "내가 쓴 후기만 고치거나 지울 수 있습니다.")
-
-
-def own_post_like() -> AppError:
-    return AppError(403, "FORBIDDEN", "내가 쓴 후기에는 좋아요를 누를 수 없습니다.")
 
 
 # ------------------------------------------------------------------ 입력 검사
@@ -103,10 +95,8 @@ def get_own_post(db: Any, user: Any, post_id: Any) -> dict:
 
 
 def list_posts(db: Any, user: Any, *, address: str | None = None, floor: int | None = None,
-               topic: str | None = None, mine: bool = False, limit: int = DEFAULT_LIMIT,
-               sort: str = "latest") -> list[dict]:
-    """최신순(sort=latest) 또는 좋아요 많은순(sort=likes, 같으면 최신순).
-    address는 부분 일치, floor·topic은 같은 값만(층수를 비운 글은 층 필터에 안 걸린다)."""
+               topic: str | None = None, mine: bool = False, limit: int = DEFAULT_LIMIT) -> list[dict]:
+    """최신순. address는 부분 일치, floor·topic은 같은 값만(층수를 비운 글은 층 필터에 안 걸린다)."""
     filters: dict[str, Any] = {}
     if floor is not None:
         filters["floor"] = int(floor)
@@ -115,32 +105,10 @@ def list_posts(db: Any, user: Any, *, address: str | None = None, floor: int | N
     if mine:
         filters["profile_id"] = user.profile_id
     query = (address or "").strip()
-    if not query and sort != "likes":
+    if not query:
         return db.select(POSTS, filters, order_by="created_at", desc=True, limit=limit)
     rows = db.select(POSTS, filters, order_by="created_at", desc=True, limit=SEARCH_SCAN)
-    if query:
-        rows = [r for r in rows if address_matches(query, r.get("address_key") or "")]
-    if sort == "likes":
-        counts = like_counts(db, [str(r["id"]) for r in rows])
-        rows = sorted(rows, key=lambda r: counts.get(str(r["id"]), 0), reverse=True)   # 안정 정렬: 같으면 최신순 유지
-    return rows[:limit]
-
-
-def like_counts(db: Any, post_ids: list[str]) -> dict[str, int]:
-    if not post_ids:
-        return {}
-    counts: dict[str, int] = {}
-    for r in db.select(LIKES, {"post_id": [str(p) for p in post_ids]}):
-        key = str(r["post_id"])
-        counts[key] = counts.get(key, 0) + 1
-    return counts
-
-
-def liked_post_ids(db: Any, user: Any, post_ids: list[str]) -> set[str]:
-    if not post_ids:
-        return set()
-    rows = db.select(LIKES, {"post_id": [str(p) for p in post_ids], "profile_id": user.profile_id})
-    return {str(r["post_id"]) for r in rows}
+    return [r for r in rows if address_matches(query, r.get("address_key") or "")][:limit]
 
 
 def nicknames(admin_db: Any, profile_ids: list[str]) -> dict[str, str]:
@@ -162,8 +130,7 @@ def photos_by_post(db: Any, post_ids: list[str]) -> dict[str, dict]:
     return {str(r["post_id"]): r for r in rows}
 
 
-def _summary_fields(row: dict, user: Any, names: dict[str, str], has_photo: bool,
-                    like_count: int = 0, liked_by_me: bool = False) -> dict:
+def _summary_fields(row: dict, user: Any, names: dict[str, str], has_photo: bool) -> dict:
     pid = str(row.get("profile_id"))
     return {
         "id": str(row["id"]),
@@ -175,8 +142,6 @@ def _summary_fields(row: dict, user: Any, names: dict[str, str], has_photo: bool
         "nickname": names.get(pid, UNKNOWN_NICKNAME),
         "is_mine": pid == str(user.profile_id),
         "has_photo": has_photo,
-        "like_count": like_count,
-        "liked_by_me": liked_by_me,
         "created_at": row["created_at"],
         "updated_at": row.get("updated_at") or row["created_at"],
     }
@@ -184,13 +149,8 @@ def _summary_fields(row: dict, user: Any, names: dict[str, str], has_photo: bool
 
 def to_summaries(db: Any, admin_db: Any, user: Any, rows: list[dict]) -> list[PostSummaryOut]:
     names = nicknames(admin_db, [r.get("profile_id") for r in rows])
-    ids = [str(r["id"]) for r in rows]
-    photos = photos_by_post(db, ids)
-    counts = like_counts(db, ids)
-    liked = liked_post_ids(db, user, ids)
-    return [PostSummaryOut(**_summary_fields(r, user, names, str(r["id"]) in photos,
-                                             counts.get(str(r["id"]), 0), str(r["id"]) in liked))
-            for r in rows]
+    photos = photos_by_post(db, [str(r["id"]) for r in rows])
+    return [PostSummaryOut(**_summary_fields(r, user, names, str(r["id"]) in photos)) for r in rows]
 
 
 def to_photo_out(row: dict, storage: Storage, access_token: str) -> PostPhotoOut:
@@ -206,12 +166,10 @@ def to_photo_out(row: dict, storage: Storage, access_token: str) -> PostPhotoOut
 
 
 def to_post_out(db: Any, admin_db: Any, user: Any, row: dict, storage: Storage) -> PostOut:
-    pid = str(row["id"])
     names = nicknames(admin_db, [row.get("profile_id")])
-    photo = photos_by_post(db, [pid]).get(pid)
+    photo = photos_by_post(db, [str(row["id"])]).get(str(row["id"]))
     return PostOut(
-        **_summary_fields(row, user, names, photo is not None,
-                          like_count_of(db, pid), pid in liked_post_ids(db, user, [pid])),
+        **_summary_fields(row, user, names, photo is not None),
         body=row["body"],
         photo=to_photo_out(photo, storage, user.access_token) if photo else None,
     )
@@ -273,39 +231,7 @@ def delete_post(db: Any, user: Any, post_id: Any, storage: Storage) -> None:
     photos = db.select(PHOTOS, {"post_id": str(post["id"])})
     delete_files(storage, [p["storage_path"] for p in photos], user.access_token)
     db.delete(PHOTOS, {"post_id": str(post["id"])})
-    db.delete(POSTS, {"id": str(post["id"])})   # 좋아요는 DB의 ON DELETE CASCADE로 함께 지워진다
-
-
-# ------------------------------------------------------------------ 좋아요
-def like_count_of(db: Any, post_id: str) -> int:
-    return like_counts(db, [post_id]).get(str(post_id), 0)
-
-
-def _like_out(db: Any, user: Any, post_id: str) -> PostLikeOut:
-    return PostLikeOut(post_id=post_id, like_count=like_count_of(db, post_id),
-                       liked_by_me=post_id in liked_post_ids(db, user, [post_id]))
-
-
-def like_post(db: Any, user: Any, post_id: Any) -> PostLikeOut:
-    """누르기. 이미 눌렀으면 그대로 둔다(여러 번 보내도 1번). 내 글이면 403."""
-    post = get_post(db, post_id)
-    if str(post.get("profile_id")) == str(user.profile_id):
-        raise own_post_like()
-    pid = str(post["id"])
-    if not liked_post_ids(db, user, [pid]):
-        try:
-            db.insert(LIKES, {"post_id": pid, "profile_id": user.profile_id})
-        except UniqueViolation:   # 동시에 두 번 눌러 이미 들어간 경우
-            pass
-    return _like_out(db, user, pid)
-
-
-def unlike_post(db: Any, user: Any, post_id: Any) -> PostLikeOut:
-    """취소. 누른 적이 없어도 오류 없이 현재 상태를 준다."""
-    post = get_post(db, post_id)
-    pid = str(post["id"])
-    db.delete(LIKES, {"post_id": pid, "profile_id": user.profile_id})
-    return _like_out(db, user, pid)
+    db.delete(POSTS, {"id": str(post["id"])})
 
 
 def build_storage_path(auth_user_id: str, post_id: str, photo_id: str, content_type: str) -> str:

@@ -28,7 +28,7 @@ house-tour-notes/
 │  ├─ features/<기능>/               백엔드와 같은 대화창 (pages.py, sections.py, 부품)
 │  └─ requirements/                  backend와 같은 규칙
 ├─ .streamlit/                       R: secrets.toml.example · P8: config.toml
-├─ supabase/migrations/              R · F12: 0120_scoring.sql · F13: 0131_listing_locations.sql, 0132_drop_map_listings.sql · F14: 0140_community.sql, 0141_community_likes.sql
+├─ supabase/migrations/              R · F12: 0120_scoring.sql · F13: 0131_listing_locations.sql, 0132_drop_map_listings.sql · F14: 0140_community.sql
 ├─ eval/                             P7
 ├─ docs/                             R: CONTRACT.md, OWNERS.md · P6: METRICS.md · P8: DEPLOY.md, DEMO_CHECKLIST.md, EXTENSION.md, USABILITY_EVAL.md
 ├─ compose.yaml                      P8 (로컬용 Redis 호환 저장소 하나)
