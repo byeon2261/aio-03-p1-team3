@@ -86,7 +86,7 @@
 
 - v3 프롬프트 개선
 
-UI 디자인 개선은 10/19 팀 회의에서 보류를 풀고 진행하기로 했다(담당은 Issue Assignees). 공통 테마(회색 배경 + 흰 카드, Pretendard, 강조색 `#3246D3`)는 `.streamlit/config.toml` `[theme]`과 `frontend/core/theme.css`가 맡고, 기준은 `docs/SCREEN_DESIGN.md` 3절.
+UI 디자인 개선은 10/19 팀 회의에서 보류를 풀고 진행하기로 했다(담당은 Issue Assignees). 공통 테마(회색 배경 + 흰 카드, Pretendard, 강조색 `#3246D3`)는 `.streamlit/config.toml` `[theme]`과 `frontend/core/theme.css`가 맡고, 기준은 `docs/SCREEN_DESIGN.md` 3절. 세션 상세는 요약 숫자 카드(본 집·예산 안·확인 필요·최저 월 고정비), 매물 카드(사진 | 정보·상태 칩 | 월 고정비), 'AI로 한 번에 정리' 배너로 바꿨다(기존 API 응답만 사용, 설계서 4.3절).
 
 ## 4. 남은 작업
 

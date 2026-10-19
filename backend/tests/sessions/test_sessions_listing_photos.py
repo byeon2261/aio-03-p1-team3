@@ -52,6 +52,7 @@ def fake():
     mod.responses = {
         f"/sessions/{SID}/listings": LISTINGS,
         f"/sessions/{SID}/locations": [],
+        f"/sessions/{SID}/comparison": {"session_id": SID, "enough_listings": True, "rows": []},  # 요약 숫자용
         # 최신순: 1번 집에 사진 2장(p-1을 먼저 올림), 다른 세션 사진 1장
         "/me/photos": [_photo("p-2", "l-1"), _photo("p-other", "l-9", sid="s-9"), _photo("p-1", "l-1")],
     }

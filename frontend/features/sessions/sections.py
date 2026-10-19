@@ -1,8 +1,9 @@
 """F2·F3 상세 화면 섹션.
 
-- session_detail (order 10): 매물 목록(제목 옆 [AI 정리]로 정리 안 된 매물 한 번에 분석, 사진이 있으면 카드에
-  대표 사진, 오른쪽에 F13 매물 지도), 새 메모 입력,
-  세션 제목·방문일 수정, 세션 삭제
+- session_detail (order 10): 맨 위 요약 숫자 카드(본 집·예산 안·확인 필요·최저 월 고정비), 매물 카드 목록
+  (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[열기]), 오른쪽 열에 'AI로 한 번에 정리' 배너([AI 정리])와
+  F13 매물 지도, 새 메모 입력, 세션 제목·방문일 수정, 세션 삭제.
+  요약 숫자·카드 숫자·예산 칩은 같은 화면의 비교표가 쓰는 GET /sessions/{id}/comparison 응답에서 만든다(summary.py).
 - listing_detail (order 10): 분석 상태 안내, 메모 편집·저장, 매물 삭제
 """
 
@@ -16,7 +17,7 @@ import streamlit as st
 from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
-from features.sessions import analyze_all
+from features.sessions import analyze_all, summary
 from features.sessions.common import flash, parse_date, show_flash, status_next_step, status_text
 from features.sessions.memo_editor import render_memo_editor
 from features.map.listing_map import render_session_map
@@ -28,11 +29,6 @@ CLEANUP_FAILED_MESSAGE = "사진 정리에 실패했습니다. 다시 삭제하�
 
 def _confirm_key(kind: str, rid: str) -> str:
     return f"p1_confirm_delete:{kind}:{rid}"
-
-
-def _preview(text: str, n: int = 60) -> str:
-    one_line = " ".join((text or "").split())
-    return one_line if len(one_line) <= n else one_line[:n] + "…"
 
 
 logger = logging.getLogger("frontend.sessions")
@@ -70,50 +66,99 @@ def _thumbnail(photos: list[dict], label: str) -> None:
     )
 
 
-def _listing_card(lst: dict, photos: list[dict] | None = None) -> None:
+def _session_comparison(session_id: str) -> dict | None:
+    """요약 숫자·카드 숫자에 쓸 비교표 응답(예산 필터 없이 전체 매물). 못 불러오면 None(숫자 없이 목록만 표시).
+
+    비교표 섹션(P3)도 같은 API를 부른다. 이 화면 안의 부가 정보라 실패해도 오류 상자는 띄우지 않는다.
+    """
+    try:
+        return api_get(f"/sessions/{session_id}/comparison")
+    except ApiError as e:
+        logger.warning("session comparison unavailable: %s", e.code)
+    except Exception as exc:  # 응답 형식이 예상과 달라도 매물 목록은 보여야 한다
+        logger.warning("session comparison unavailable: %s", type(exc).__name__)
+    return None
+
+
+def _render_summary(listings: list[dict], comparison: dict | None) -> None:
+    cols = st.columns(4)
+    for col, m in zip(cols, summary.summary_metrics(listings, comparison)):
+        col.metric(m["label"], m["value"], help=m["help"])
+    if comparison is None:
+        st.caption("요약 숫자를 불러오지 못했습니다. 아래 매물 비교표에서 확인하거나 새로 고쳐 주세요.")
+
+
+def _no_photo() -> None:
+    st.markdown(
+        '<div style="width:100%;aspect-ratio:4/3;max-height:120px;border-radius:10px;background:#eef2fb;display:flex;'
+        'align-items:center;justify-content:center;color:#64636d;font-size:12px">사진 없음</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _price(row: dict | None) -> None:
+    lines = summary.price_lines(row)
+    if not lines:
+        return
+    main, sub = lines
+    sub_html = "<br>".join(html.escape(part) for part in sub.split(" · "))   # 좁은 칸에서 한 줄씩
+    st.markdown(
+        f'<div style="text-align:right;line-height:1.3;margin-bottom:6px"><div style="font-size:1.35rem;'
+        f'font-weight:800;color:#3246d3">{html.escape(main)}</div>'
+        f'<div style="font-size:12px;color:#64636d">{sub_html}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _listing_card(lst: dict, photos: list[dict] | None = None, row: dict | None = None) -> None:
     with st.container(border=True):
-        if photos:
-            thumb, left, right = st.columns([1.3, 3, 1], vertical_alignment="center")
-            with thumb:
+        thumb, left, right = st.columns([1.2, 3, 1.4], vertical_alignment="center")
+        with thumb:
+            if photos:
                 _thumbnail(photos, lst["label"])
-        else:
-            left, right = st.columns([4, 1], vertical_alignment="center")
+            else:
+                _no_photo()
         with left:
-            st.markdown(f"**{lst['label']}** · {status_text(lst)}")
-            st.caption(_preview(lst.get("memo_text", "")))
+            st.markdown(f"**{lst['label']}**")
+            st.caption(summary.info_line(lst, row))
+            st.markdown(" ".join(summary.chips(lst, row)))
             hint = analyze_all.CARD_HINT if analyze_all.needs_analysis(lst) else status_next_step(lst)
             if hint:
                 st.caption(hint)
         with right:
+            _price(row)
             if st.button("열기", key=f"p1_open_listing:{lst['id']}", width="stretch"):
                 nav.go_listing_detail(lst["id"])
 
 
 def _render_listings(session: dict) -> None:
     sid = session["id"]
-    title, action = st.columns([4, 1], vertical_alignment="bottom")
-    title.subheader("매물")
     try:
         with st.spinner("매물을 불러오는 중…"):
             listings = api_get(f"/sessions/{sid}/listings")
     except ApiError as e:
+        st.subheader("매물")
         show_api_error(e)
         if st.button("다시 시도", key=f"p1_listings_retry:{sid}"):
             st.rerun()
         return
     if not listings:
+        st.subheader("매물")
         st.info("아직 매물이 없습니다. 아래 '새 메모'에 첫 집 메모를 적고 저장하세요.")
         return
-    with action:
-        analyze_all.render_button(listings, sid)
+    comparison = _session_comparison(sid)
+    _render_summary(listings, comparison)
+    st.subheader("매물")
     photos = _session_photos(sid)
-    cards, map_area = st.columns([3, 2])
+    rows = summary.rows_by_listing(comparison)
+    cards, side = st.columns([3, 2])
     with cards:
         for lst in listings:
-            _listing_card(lst, photos.get(str(lst["id"])))
+            _listing_card(lst, photos.get(str(lst["id"])), rows.get(str(lst["id"])))
         if len(listings) == 1:
             st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
-    with map_area:
+    with side:
+        analyze_all.render_banner(listings, sid)
         # F13: 위치를 넣은 매물을 지도에 찍는다(features/map/listing_map.py)
         render_session_map(session, listings)
 
