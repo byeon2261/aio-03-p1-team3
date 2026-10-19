@@ -94,7 +94,7 @@
 | # | 작업 | 산출물 | 완료 기준 | 마감 |
 |---|---|---|---|---|
 | 1 | API 설계 문서 | `docs/API_DESIGN.md` | 1절 API 요구사항 전부, 실제 코드(`backend/app/features/*/router.py`, `core/schemas.py`, `core/errors.py`)와 일치 | 10/20 · 완료(#3) |
-| 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 |
+| 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 · 완료(#4) |
 | 3 | DB 설계서 | `docs/DB_DESIGN.md` | 1절 DB 요구사항 전부, `supabase/migrations/*`와 일치 | 10/20 |
 | 3+ | (선택) DB 컬럼 코멘트 마이그레이션 | `supabase/migrations/0009_comments.sql` | 실제 DB에 코멘트 반영 | 10/20 |
 | 4 | 사용자 피드백 수집 | 서비스 안의 평가 기록 | 팀원·수강생 평가가 답변에 연결돼 저장 | 10/20 |
