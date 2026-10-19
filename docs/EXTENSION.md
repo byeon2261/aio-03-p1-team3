@@ -7,7 +7,7 @@ F12·F14는 구현했고(아래 F12·F14 절), F13은 내 매물 위치·세션 
 
 - 백엔드: `backend/app/features/<이름>/`에 `router.py`(변수 `router`)와 필요하면 `hooks.py`를 두면 자동 등록된다. `hooks.py`의 등록 코드는 여러 번 실행돼도 안전해야 한다. [요청]
 - 프론트: `frontend/features/<이름>/`에 `pages.py`(`PAGES`)·`sections.py`(`SECTIONS`). import 때 Streamlit 함수를 부르지 않는다. [요청]
-- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~`(사용 중: `0131_listing_locations.sql`, `0132_drop_map_listings.sql`. `0130`은 지운 더미 매물이 썼던 번호라 다시 쓰지 않음), F14 `0140~`(사용 중: `0140_community.sql`). [요청]
+- 마이그레이션 번호대: F12 `0120~`(사용 중: `0120_scoring.sql`), F13 `0130~`(사용 중: `0131_listing_locations.sql`, `0132_drop_map_listings.sql`. `0130`은 지운 더미 매물이 썼던 번호라 다시 쓰지 않음), F14 `0140~`(사용 중: `0140_community.sql`, `0141_community_likes.sql`). [요청]
 - 추가 패키지는 `backend/requirements/<기능>.txt`·`frontend/requirements/<기능>.txt`에 `==`로 고정한다. [Claude 제안]
 - 새 테이블은 기존처럼 소유 사슬(profile → session → listing)로 RLS를 걸고, 소유 확인은 `core/ownership.py` 방식(타인 리소스는 404)을 따른다. [Claude 제안]
 

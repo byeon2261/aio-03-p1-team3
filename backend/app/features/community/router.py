@@ -5,6 +5,7 @@
 - 필수 address·topic·title·body, 선택 floor·visit_date·사진 1장(JPG·PNG, 5MB).
 - 주소는 부분 일치, 층수·주제는 같은 값으로 거른다. 처음 목록은 전체 최신순.
 - 작성자만 고치고 지운다(남의 글 → 403 FORBIDDEN). 응답에는 닉네임만, 이메일·작성자 id는 없다.
+- 좋아요(0141): PUT·DELETE /community/posts/{post_id}/like. 내 글에는 못 누른다(403). 목록 sort=likes는 좋아요 많은순.
 - 요청 로그(C9)는 미들웨어가 경로 틀(/community/posts/{post_id})로 남긴다. 주소·본문은 로그에 남지 않는다.
 """
 
@@ -23,7 +24,7 @@ from app.core.schemas import OkOut
 from app.core.storage import Storage, StorageError, get_storage
 from app.features.community import service
 from app.features.community.schemas import (
-    FLOOR_MAX, FLOOR_MIN, TOPICS, PostIn, PostOut, PostSummaryOut, PostUpdateIn, TopicsOut,
+    FLOOR_MAX, FLOOR_MIN, TOPICS, PostIn, PostLikeOut, PostOut, PostSort, PostSummaryOut, PostUpdateIn, TopicsOut,
 )
 
 logger = logging.getLogger("app.features.community")
@@ -42,13 +43,15 @@ def list_posts(
     topic: str | None = Query(default=None),
     mine: bool = Query(default=False, description="true면 내가 쓴 후기만"),
     limit: int = Query(default=service.DEFAULT_LIMIT, ge=1, le=service.MAX_LIMIT),
+    sort: PostSort = Query(default="latest", description="latest(최신순) · likes(좋아요 많은순, 같으면 최신순)"),
     user: CurrentUser = Depends(get_current_user),
     db: Database = Depends(get_user_db),
     admin_db: Database = Depends(get_admin_db),
 ) -> list[PostSummaryOut]:
     if topic is not None and topic not in TOPICS:
         raise AppError(422, "VALIDATION_ERROR", f"주제는 {', '.join(TOPICS)} 중 하나입니다.", {"reason": "topic"})
-    rows = service.list_posts(db, user, address=address, floor=floor, topic=topic, mine=mine, limit=limit)
+    rows = service.list_posts(db, user, address=address, floor=floor, topic=topic, mine=mine, limit=limit,
+                              sort=sort)
     return service.to_summaries(db, admin_db, user, rows)
 
 
@@ -98,6 +101,26 @@ def delete_post(
     """사진 파일을 먼저 지운다. 실패하면 503 CLEANUP_FAILED이고 글은 남는다."""
     service.delete_post(db, user, post_id, storage)
     return OkOut()
+
+
+@router.put("/community/posts/{post_id}/like", response_model=PostLikeOut)
+def like_post(
+    post_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    db: Database = Depends(get_user_db),
+) -> PostLikeOut:
+    """좋아요 누르기. 여러 번 보내도 1번만 센다. 내 글이면 403 FORBIDDEN."""
+    return service.like_post(db, user, post_id)
+
+
+@router.delete("/community/posts/{post_id}/like", response_model=PostLikeOut)
+def unlike_post(
+    post_id: str,
+    user: CurrentUser = Depends(get_current_user),
+    db: Database = Depends(get_user_db),
+) -> PostLikeOut:
+    """좋아요 취소. 누른 적이 없어도 200으로 현재 상태를 준다."""
+    return service.unlike_post(db, user, post_id)
 
 
 @router.post("/community/posts/{post_id}/photo", response_model=PostOut)

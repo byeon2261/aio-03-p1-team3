@@ -10,7 +10,7 @@ FastAPI 서버(`backend/`)가 제공하는 HTTP API의 설계 문서입니다. �
 |---|---|
 | 기준 코드 | `main` 커밋 `8ee3752`(PR #29 병합 시점, F1~F14 포함) |
 | 기준 파일 | `backend/app/main.py`, `backend/app/features/*/router.py`, 기능 폴더의 `schemas.py`, `backend/app/core/schemas.py`, `backend/app/core/errors.py` |
-| 엔드포인트 수 | **67개**(기능 라우터 65 + `main.py`의 `/health`·`/ready` 2) |
+| 엔드포인트 수 | **69개**(기능 라우터 67 + `main.py`의 `/health`·`/ready` 2). 발품 후기 좋아요 E68·E69는 기준 커밋 뒤에 더했다 |
 | 일치 확인 | `backend/tests/core/test_api_design_doc.py`가 4절 표와 7절 오류 코드 표를 코드와 비교한다(10절) |
 | 관련 문서 | `docs/CONTRACT.md`(개발용 계약 메모), `docs/METRICS.md`(지표 정의), `docs/DB_DESIGN.md`(DB), `docs/SCREEN_DESIGN.md`(화면) |
 
@@ -19,11 +19,11 @@ FastAPI 서버(`backend/`)가 제공하는 HTTP API의 설계 문서입니다. �
 | 표기 | 뜻 | 인증 실패 시 |
 |---|---|---|
 | 공개 | 토큰 없이 호출 | - |
-| 로그인 | 로그인한 사용자 누구나. 개인 소유가 아닌 데이터(평가 항목·후기 주제·발품 후기 읽기)이거나 새로 만드는 본인 글 | 401 `AUTH_REQUIRED` |
-| 본인 | 로그인 + 본인 데이터만. 남의 것·없는 것은 404(`*_NOT_FOUND`), 발품 후기 고치기·지우기만 403 `FORBIDDEN` | 401 `AUTH_REQUIRED` |
+| 로그인 | 로그인한 사용자 누구나. 개인 소유가 아닌 데이터(평가 항목·후기 주제·발품 후기 읽기·좋아요)이거나 새로 만드는 본인 글 | 401 `AUTH_REQUIRED` |
+| 본인 | 로그인 + 본인 데이터만. 남의 것·없는 것은 404(`*_NOT_FOUND`), 발품 후기 고치기·지우기(와 내 후기에 좋아요)만 403 `FORBIDDEN` | 401 `AUTH_REQUIRED` |
 | 운영자 | 로그인 + `profiles.role = 'admin'` | 401 `AUTH_REQUIRED` / 일반 사용자 403 `FORBIDDEN` |
 
-권한별 개수: 공개 6 · 로그인 5 · 본인 49 · 운영자 7 = 67.
+권한별 개수: 공개 6 · 로그인 7 · 본인 49 · 운영자 7 = 69.
 
 ## 1. 개요
 
@@ -115,13 +115,14 @@ flowchart TD
     L --> SA["/listings/{id}/satisfaction (항목 만족도)"]
     WP -. 고름 .-> SC
     CP["/community/posts (발품 후기, 로그인 사용자 공용)"] --> CPP["/community/posts/{id}/photo"]
+    CP --> CPL["/community/posts/{id}/like (좋아요)"]
     ADM["/admin (운영자)"] --> AL["logs · logs/stream · metrics · feedback"]
     ADM --> EV["eval-runs → eval-runs/{id}/results"]
 ```
 
 ## 4. 엔드포인트 전체 목록
 
-코드(`app.openapi()`)의 엔드포인트 67개 전체입니다. 이 표의 (메서드, 경로)는 테스트가 코드와 비교합니다(10절). 엔드포인트를 더하거나 바꾸면 이 표와 5절을 함께 고칩니다.
+코드(`app.openapi()`)의 엔드포인트 69개 전체입니다. 이 표의 (메서드, 경로)는 테스트가 코드와 비교합니다(10절). 엔드포인트를 더하거나 바꾸면 이 표와 5절을 함께 고칩니다.
 
 | No | 메서드 | 경로 | 기능 | 권한 | 요청 → 응답(200) |
 |---|---|---|---|---|---|
@@ -178,13 +179,15 @@ flowchart TD
 | E51 | GET | `/sessions/{session_id}/locations` | F13 지도 | 본인 | - → `list[SessionPinOut]` |
 | E52 | GET | `/me/locations` | F13 지도 | 본인 | - → `MyPinsOut` |
 | E53 | GET | `/community/topics` | F14 발품 후기 | 로그인 | - → `TopicsOut` |
-| E54 | GET | `/community/posts` | F14 발품 후기 | 로그인 | `?address=&floor=&topic=&mine=&limit=` → `list[PostSummaryOut]` |
+| E54 | GET | `/community/posts` | F14 발품 후기 | 로그인 | `?address=&floor=&topic=&mine=&limit=&sort=` → `list[PostSummaryOut]` |
 | E55 | POST | `/community/posts` | F14 발품 후기 | 로그인 | `PostIn` → `PostOut` |
 | E56 | GET | `/community/posts/{post_id}` | F14 발품 후기 | 로그인 | - → `PostOut` |
 | E57 | PATCH | `/community/posts/{post_id}` | F14 발품 후기 | 본인 | `PostUpdateIn` → `PostOut` |
 | E58 | DELETE | `/community/posts/{post_id}` | F14 발품 후기 | 본인 | - → `OkOut` |
 | E59 | POST | `/community/posts/{post_id}/photo` | F14 발품 후기 | 본인 | multipart `file` → `PostOut` |
 | E60 | DELETE | `/community/posts/{post_id}/photo` | F14 발품 후기 | 본인 | - → `PostOut` |
+| E68 | PUT | `/community/posts/{post_id}/like` | F14 발품 후기 | 로그인 | - → `PostLikeOut` |
+| E69 | DELETE | `/community/posts/{post_id}/like` | F14 발품 후기 | 로그인 | - → `PostLikeOut` |
 | E61 | GET | `/admin/logs` | F8 운영 로그 | 운영자 | `?from=&to=&status=&prompt_version=&after_id=&limit=&include_admin=` → `list[RequestLogOut]` |
 | E62 | GET | `/admin/logs/stream` | F8 운영 로그 | 운영자 | 헤더 `Last-Event-ID` → SSE(`event: log`) |
 | E63 | GET | `/admin/metrics` | F8 운영 로그 | 운영자 | `?from=&to=&prompt_version=&include_admin=` → `MetricsOut` |
@@ -567,18 +570,20 @@ Content-Type: application/json
 
 ### 5.12 F14 발품 후기 (`features/community/router.py`)
 
-로그인한 사용자 모두가 읽고, 작성자만 고치고 지웁니다. 응답에는 작성자 닉네임과 `is_mine`만 있고 작성자 ID·이메일은 없습니다.
+로그인한 사용자 모두가 읽고, 작성자만 고치고 지웁니다. 응답에는 작성자 닉네임과 `is_mine`만 있고 작성자 ID·이메일은 없습니다. 좋아요는 남의 후기에만 누르고(한 사람이 한 글에 1번), 응답에는 좋아요 수와 내가 눌렀는지만 있고 누른 사람은 없습니다(`0141_community_likes.sql`).
 
 | No | 엔드포인트 | 권한 | 요청 | 응답 | 동작·주요 오류 |
 |---|---|---|---|---|---|
 | E53 | `GET /community/topics` | 로그인 | - | `TopicsOut` | 주제 5개 |
-| E54 | `GET /community/posts` | 로그인 | 쿼리 `address`(부분 일치, 200자 이하) · `floor`(-10~200) · `topic` · `mine`(기본 false) · `limit`(기본 50, 1~200) | `list[PostSummaryOut]` | 최신순. 주소는 공백·"번지"를 무시하고 부분 일치. 없는 주제 422 |
+| E54 | `GET /community/posts` | 로그인 | 쿼리 `address`(부분 일치, 200자 이하) · `floor`(-10~200) · `topic` · `mine`(기본 false) · `limit`(기본 50, 1~200) · `sort`(`latest` 기본 · `likes`) | `list[PostSummaryOut]` | 기본 최신순, `sort=likes`면 좋아요 많은순(같으면 최신순, 최근 1,000개 안에서 정렬). 주소는 공백·"번지"를 무시하고 부분 일치. 없는 주제·`sort` 값 422 |
 | E55 | `POST /community/posts` | 로그인 | `PostIn` | `PostOut` | 필수 주소·주제·제목·본문, 선택 층·방문일. 제목·본문에 전화번호·이메일 모양이 있으면 422(`reason: contact_info`) |
 | E56 | `GET /community/posts/{post_id}` | 로그인 | - | `PostOut` | 남의 글도 읽을 수 있다. 404 `POST_NOT_FOUND` |
 | E57 | `PATCH /community/posts/{post_id}` | 본인 | `PostUpdateIn` | `PostOut` | 보낸 칸만 바꾼다. 필수 칸 null 422. 남의 글 403 `FORBIDDEN`, 404 `POST_NOT_FOUND` |
 | E58 | `DELETE /community/posts/{post_id}` | 본인 | - | `OkOut` | 사진 파일 먼저 삭제. 실패 503 `CLEANUP_FAILED`(글 유지). 403 `FORBIDDEN`, 404 `POST_NOT_FOUND` |
 | E59 | `POST /community/posts/{post_id}/photo` | 본인 | multipart `file`(JPG·PNG, 5MB 이하) | `PostOut` | 글당 1장, 이미 있으면 바꾼다. 422(`detail.reason`), 503 `STORAGE_UNAVAILABLE`, 403 `FORBIDDEN`, 404 `POST_NOT_FOUND` |
 | E60 | `DELETE /community/posts/{post_id}/photo` | 본인 | - | `PostOut` | 사진만 지운다. 503 `CLEANUP_FAILED`, 403 `FORBIDDEN`, 404 `POST_NOT_FOUND` |
+| E68 | `PUT /community/posts/{post_id}/like` | 로그인 | - | `PostLikeOut` | 좋아요 누르기. 여러 번 보내도 1번만 센다. 내 후기 403 `FORBIDDEN`, 404 `POST_NOT_FOUND` |
+| E69 | `DELETE /community/posts/{post_id}/like` | 로그인 | - | `PostLikeOut` | 좋아요 취소. 누른 적이 없어도 200으로 현재 상태. 404 `POST_NOT_FOUND` |
 
 ```http
 POST /community/posts
@@ -594,6 +599,7 @@ Content-Type: application/json
   "address": "예시시 예시구 예시동 123-45",
   "floor": 3, "topic": "소음", "visit_date": "2026-10-17",
   "title": "밤 도로 소음", "nickname": "집보기왕", "is_mine": true, "has_photo": false,
+  "like_count": 0, "liked_by_me": false,
   "created_at": "2026-10-18T12:47:24Z", "updated_at": "2026-10-18T12:47:24Z",
   "body": "밤에 도로 소음이 큽니다.",
   "photo": null
@@ -1151,7 +1157,7 @@ Content-Type: application/json
 | `entered_count` | integer | 선택 | `0` |  | 만족도를 입력한 항목 수 | `5` |
 | `total_items` | integer | 선택 | `0` |  | 평가 항목 수 | `9` |
 
-### 6.8 발품 후기 (E53~E60)
+### 6.8 발품 후기 (E53~E60, E68·E69)
 
 #### TopicsOut — `features/community/schemas.py`
 
@@ -1194,6 +1200,8 @@ Content-Type: application/json
 | `nickname` | string | 필수 | - |  | 작성자 닉네임(작성자 ID·이메일은 주지 않음) | `"집보기왕"` |
 | `is_mine` | boolean | 필수 | - |  | 내가 쓴 글인지 | `true` |
 | `has_photo` | boolean | 필수 | - |  | 사진이 있는지 | `false` |
+| `like_count` | integer | 선택 | `0` |  | 좋아요 수 | `8` |
+| `liked_by_me` | boolean | 선택 | `false` |  | 내가 좋아요를 눌렀는지(내 글은 항상 false) | `true` |
 | `created_at` | datetime | 필수 | - |  | 만든 시각(UTC) | `"2026-10-18T05:30:00Z"` |
 | `updated_at` | datetime | 필수 | - |  | 마지막으로 바꾼 시각(UTC) | `"2026-10-18T05:30:00Z"` |
 
@@ -1210,10 +1218,20 @@ Content-Type: application/json
 | `nickname` | string | 필수 | - |  | 작성자 닉네임(작성자 ID·이메일은 주지 않음) | `"집보기왕"` |
 | `is_mine` | boolean | 필수 | - |  | 내가 쓴 글인지 | `true` |
 | `has_photo` | boolean | 필수 | - |  | 사진이 있는지 | `false` |
+| `like_count` | integer | 선택 | `0` |  | 좋아요 수 | `8` |
+| `liked_by_me` | boolean | 선택 | `false` |  | 내가 좋아요를 눌렀는지(내 글은 항상 false) | `true` |
 | `created_at` | datetime | 필수 | - |  | 만든 시각(UTC) | `"2026-10-18T05:30:00Z"` |
 | `updated_at` | datetime | 필수 | - |  | 마지막으로 바꾼 시각(UTC) | `"2026-10-18T05:30:00Z"` |
 | `body` | string | 필수 | - |  | 후기 본문 | `"밤에 도로 소음이 큽니다."` |
 | `photo` | PostPhotoOut \| null | 선택 | `null` |  | 사진(nested PostPhotoOut). 없으면 null | `null` |
+
+#### PostLikeOut — `features/community/schemas.py`
+
+| 필드 | 타입 | 필수 | 기본값 | 제약 | 설명 | 예시 |
+|---|---|---|---|---|---|---|
+| `post_id` | string | 필수 | - |  | 후기 ID | `"c9000000-0000-4000-8000-000000000001"` |
+| `like_count` | integer | 필수 | - |  | 누르기·취소 뒤 좋아요 수 | `9` |
+| `liked_by_me` | boolean | 필수 | - |  | 내가 눌렀는지 | `true` |
 
 #### PostPhotoOut — `features/community/schemas.py`
 
