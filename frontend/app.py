@@ -2,7 +2,7 @@
 
 - 로그인 전: 로그인 페이지만.
 - 로그인 후: features/*/pages.py의 PAGES + R 상세 페이지 2개(세션 상세 20, 매물 상세 30)를 order 순으로.
-  admin_only 페이지는 운영자에게만 보인다.
+  admin_only 페이지는 운영자에게만 보인다. hidden=True 페이지는 사이드바 메뉴에 안 보이고 버튼으로만 간다.
 """
 
 from __future__ import annotations
@@ -21,9 +21,9 @@ from core.ui import privacy_notice  # noqa: E402
 from features.auth.pages import render_login  # noqa: E402
 
 HOST_PAGES = [
-    {"key": "session_detail", "title": "세션 상세", "order": 20, "admin_only": False,
+    {"key": "session_detail", "title": "세션 상세", "order": 20, "admin_only": False, "hidden": True,
      "render": render_session_detail, "feature": "core"},
-    {"key": "listing_detail", "title": "매물 상세", "order": 30, "admin_only": False,
+    {"key": "listing_detail", "title": "매물 상세", "order": 30, "admin_only": False, "hidden": True,
      "render": render_listing_detail, "feature": "core"},
 ]
 WAKE_LIMIT_SEC = 60
@@ -74,9 +74,11 @@ def main() -> None:
     slots.register_sections(load_sections())
     items = [p for p in load_pages() + HOST_PAGES if state.is_admin() or not p["admin_only"]]
     items.sort(key=lambda p: (p["order"], p["key"]))
+    default_key = next((p["key"] for p in items if not p.get("hidden")), items[0]["key"])
     pages = {
-        p["key"]: st.Page(p["render"], title=p["title"], url_path=p["key"], default=(i == 0))
-        for i, p in enumerate(items)
+        p["key"]: st.Page(p["render"], title=p["title"], url_path=p["key"], default=(p["key"] == default_key),
+                          visibility="hidden" if p.get("hidden") else "visible")
+        for p in items
     }
     nav.register_pages(pages)
     sidebar()

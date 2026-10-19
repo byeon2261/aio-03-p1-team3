@@ -2,6 +2,7 @@
 
 pages.py·sections.py는 import할 때 st 함수를 부르지 않는다(함수 정의만).
     PAGES    = [{"key": str, "title": str, "order": int, "admin_only": bool, "render": callable}]
+               선택 "hidden": True면 사이드바 메뉴에 안 보인다(다른 화면의 버튼·nav로만 간다).
     SECTIONS = [{"slot": str, "order": int, "render": callable(ctx: dict)}]
 key는 영어 소문자·숫자·밑줄(URL 경로로 쓴다).
 """
