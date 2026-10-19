@@ -287,8 +287,22 @@ export default function(component) {
       const label = document.createElement("button");
       label.type = "button";
       label.className = "map-pins-label";
-      label.textContent = pin.label;
-      const overlay = new maps.CustomOverlay({position, content: label, yAnchor: 2.9, map: state.map, clickable: true});
+      if (pin.group) {   // 전체 매물: 위 줄 세션 이름, 아래 줄 N번 집
+        label.classList.add("map-pins-label--group");
+        const group = document.createElement("span");
+        group.className = "map-pins-label__group";
+        group.textContent = pin.group;
+        const name = document.createElement("span");
+        name.textContent = pin.label;
+        label.append(group, name);
+        label.title = pin.group + " · " + pin.label;
+      } else {
+        label.textContent = pin.label;
+      }
+      const labelWrap = document.createElement("div");
+      labelWrap.className = "map-pins-label-wrap";   // 이름표 높이와 상관없이 핀 바로 위에 둔다
+      labelWrap.append(label);
+      const overlay = new maps.CustomOverlay({position, content: labelWrap, yAnchor: 1, map: state.map, clickable: true});
       state.pinIndex[pin.id] = {pin, position};
       const listener = () => openCard(pin, position);
       label.addEventListener("click", event => {
@@ -518,6 +532,24 @@ PINS_CSS = """
   box-shadow: 0 2px 6px rgba(29, 78, 216, 0.35);
 }
 .map-pins-label:hover { background: #1e40af; }
+.map-pins-label-wrap { padding-bottom: 44px; pointer-events: none; }
+.map-pins-label-wrap .map-pins-label { pointer-events: auto; }
+.map-pins-label--group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 160px;
+  padding: 4px 10px;
+  border-radius: 10px;
+}
+.map-pins-label__group {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
 .map-pin-card-wrap { padding-bottom: 84px; pointer-events: none; }
 .map-pin-card-wrap .map-pin-card { pointer-events: auto; }
 .map-pin-card {
@@ -545,7 +577,7 @@ PINS_CSS = """
   transform: translateX(-50%) rotate(45deg);
   box-shadow: 3px 3px 6px rgba(15, 23, 42, 0.06);
 }
-.map-pin-card__head { display: flex; align-items: center; justify-content: space-between; }
+.map-pin-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .map-pin-card__badge {
   padding: 2px 10px;
   border-radius: 999px;
@@ -553,6 +585,8 @@ PINS_CSS = """
   color: #1d4ed8;
   font-size: 14px;
   font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .map-pin-card__close {
   width: 26px;
@@ -566,7 +600,7 @@ PINS_CSS = """
   cursor: pointer;
 }
 .map-pin-card__close:hover { background: #f1f5f9; color: #475569; }
-.map-pin-card__address { margin: 8px 0 0; color: #64748b; font-size: 12px; word-break: keep-all; }
+.map-pin-card__address { margin: 8px 0 0; color: #64748b; font-size: 12px; word-break: keep-all; overflow-wrap: anywhere; }
 .map-pin-card__rows {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -577,9 +611,9 @@ PINS_CSS = """
   background: #f8fafc;
 }
 .map-pin-card__rows dt { margin: 0; color: #64748b; }
-.map-pin-card__rows dd { margin: 0; text-align: right; font-weight: 700; color: #0f172a; }
+.map-pin-card__rows dd { margin: 0; text-align: right; font-weight: 700; color: #0f172a; min-width: 0; overflow-wrap: anywhere; }
 .map-pin-card__rows dd.is-muted { font-weight: 500; color: #94a3b8; }
-.map-pin-card__note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; }
+.map-pin-card__note { margin: 10px 0 0; color: #94a3b8; font-size: 12px; overflow-wrap: anywhere; }
 .map-pin-card__link {
   display: block;
   margin-top: 12px;
@@ -742,7 +776,8 @@ def current_api_key() -> str:
 
 def pins_map(api_key: str, pins: list[dict], *, key: str, geocode: dict | None = None,
              height: int = 360, fullscreen: bool = False, panel: dict | None = None):
-    """핀 지도. pins = [{id, label, detail, latitude, longitude, rows, note, link}].
+    """핀 지도. pins = [{id, label, detail, latitude, longitude, rows, note, link, group?}].
+    group이 있으면 핀 이름표를 두 줄(위 group, 아래 label)로 그린다(전체 매물: 세션 이름).
 
     geocode = {id, query, address}를 주면 그 주소를 좌표로 바꿔 임시 핀을 찍고 결과를 돌려준다
     (돌려받은 값의 .geocoded = {id, ok, latitude, longitude, roadAddress, parcelAddress, zonecode, buildingName}).

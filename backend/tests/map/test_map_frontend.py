@@ -83,6 +83,9 @@ def test_map_api_key_sources(tmp_path, monkeypatch):
 def test_all_listings_logic():
     pin = logic.my_pins([PIN])[0]
     assert pin["detail"] == "토요일 집 보기 · 가상시 예시구 샘플로 1"
+    assert (pin["group"], pin["label"]) == ("토요일 집 보기", "1번 집")              # 핀 이름표 두 줄
+    assert "group" not in logic.my_pins([{**PIN, "session_title": " "}])[0]       # 세션 이름 없으면 한 줄
+    assert "group" not in logic.session_pins([PIN])[0]                           # 세션 상세 지도는 한 줄
     assert pin["link"] is True and [r["value"] for r in pin["rows"]] == ["1,000만원", "40만원"]
     panel = logic.panel_text([PIN, {**PIN, "listing_id": "l-2"}], 5, {"l-1": "https://example.com/a.png"})
     assert panel["title"] == "전체 매물" and panel["subtitle"] == "위치를 넣은 매물 2곳 · 위치 없는 매물 3곳"
