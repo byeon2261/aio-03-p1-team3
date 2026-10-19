@@ -73,11 +73,11 @@
   - v1: 필드 정확도 95.0%, 빠진 항목 정확도 80.0%, 실패 유형 NUM 3·CHK 4
   - v2: 필드 정확도 95.6%, 빠진 항목 정확도 75.0%, 실패 유형 NUM 2·CHK 5
   - 숫자 오류는 줄었지만 체크리스트 판정은 나빠졌다. 발표에서는 그대로 보여 주고 이유를 설명한다.
-- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
+- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/SCREEN_DESIGN.md`(화면 설계서, #4. F12·F13·F14 포함), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
 
 ### 아직 없는 것
 
-- 필수 설계 문서 중 화면·DB 2종(API 설계 문서는 `docs/API_DESIGN.md`로 작성, #3). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 화면·테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
+- 필수 설계 문서 중 DB 설계서(API 설계 문서는 `docs/API_DESIGN.md`, 화면 설계서는 `docs/SCREEN_DESIGN.md`로 작성). `CONTRACT.md`는 개발용 메모라 과제 형식을 채우지 못한다. F12(항목 가중치화)·F14(발품 후기)의 테이블도 포함해야 한다(요약은 `EXTENSION.md` F12·F14 절·`CONTRACT.md`).
 - 발표 PPT.
 - 실제 사용자 피드백(팀원·수강생 평가) 수집, 피드백 → 개선 기록 문서.
 - GitHub Issue·PR 기반 협업 기록(이제부터 이 방식으로 남긴다).
@@ -94,7 +94,7 @@
 | # | 작업 | 산출물 | 완료 기준 | 마감 |
 |---|---|---|---|---|
 | 1 | API 설계 문서 | `docs/API_DESIGN.md` | 1절 API 요구사항 전부, 실제 코드(`backend/app/features/*/router.py`, `core/schemas.py`, `core/errors.py`)와 일치 | 10/20 · 완료(#3) |
-| 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 |
+| 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 · 완료(#4) |
 | 3 | DB 설계서 | `docs/DB_DESIGN.md` | 1절 DB 요구사항 전부, `supabase/migrations/*`와 일치 | 10/20 |
 | 3+ | (선택) DB 컬럼 코멘트 마이그레이션 | `supabase/migrations/0009_comments.sql` | 실제 DB에 코멘트 반영 | 10/20 |
 | 4 | 사용자 피드백 수집 | 서비스 안의 평가 기록 | 팀원·수강생 평가가 답변에 연결돼 저장 | 10/20 |
