@@ -8,6 +8,7 @@ import streamlit as st
 
 from core.ui import fmt_kst, to_kst
 from features.admin_logs.logic import (
+    RATING_LABELS,
     REASON_LABELS,
     connection_message,
     fmt_ms,
@@ -138,13 +139,15 @@ def reason_counts(m: dict) -> None:
         col.metric(label, f"{counts.get(key, 0)}건")
 
 
-def feedback_cases(items: list[dict]) -> None:
+def feedback_cases(items: list[dict], *, empty_message: str) -> None:
     if not items:
-        st.info("아직 👎 평가가 없습니다. 사용자가 분석 결과에 👎를 누르면 여기에 모입니다.")
+        st.info(empty_message)
         return
     st.dataframe([{
         "시각": fmt_kst(x.get("created_at")),
-        "사유": REASON_LABELS.get(x.get("reason") or "none", x.get("reason") or ""),
+        "평가": RATING_LABELS.get(x.get("rating") or "", x.get("rating") or ""),
+        "사유": REASON_LABELS.get(x.get("reason") or "none", x.get("reason") or "")
+        if x.get("rating") == "down" else "",
         "의견": x.get("comment") or "",
         "메모 앞부분": x.get("memo_head") or "",
         "분석 요약": x.get("analysis_summary") or "",

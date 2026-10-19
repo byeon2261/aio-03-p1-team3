@@ -2,7 +2,7 @@
 
 - 실시간 로그 피드: sse_listener의 백그라운드 스레드가 받은 로그를 @st.fragment(run_every="2s")가 큐에서 꺼내 표시.
 - 지표 카드·차트·실패 유형·프롬프트 버전별 비교: GET /admin/metrics (필터가 바뀌거나 '지표 새로 고침'을 누를 때)
-- 낮은 평가 사례: GET /admin/feedback, 사유별 개수는 metrics extra.feedback_reason_counts
+- 사용자 평가 사례: GET /admin/feedback(전체는 rating=up·down을 각각 받아 합침), 👎 사유별 개수는 metrics extra.feedback_reason_counts
 import 시 st 함수를 부르지 않는다.
 """
 
@@ -18,10 +18,13 @@ from core.ui import show_api_error
 from features.admin_logs import components
 from features.admin_logs.logic import (
     ALL_VERSIONS,
+    DEFAULT_FEEDBACK_FILTER,
     DEFAULT_PERIOD,
+    FEEDBACK_FILTERS,
     PERIODS,
     STATUS_OPTIONS,
     filter_feed,
+    merge_feedback,
     period_range,
 )
 from features.admin_logs.sse_listener import FORBIDDEN, UNAUTHORIZED, FeedBuffer, Listener
@@ -33,7 +36,14 @@ K_SEEN_CONNECT = "admin_logs:seen_connect"
 K_VERSIONS = "admin_logs:versions"
 K_REFRESH_TRY = "admin_logs:refresh_try_at"
 K_LOADED = "admin_logs:initial_loaded"
+K_FEEDBACK_FILTER = "admin_logs:feedback_filter"
 REFRESH_RETRY_SEC = 10
+FEEDBACK_LIMIT = 20
+FEEDBACK_EMPTY = {
+    "전체": "아직 사용자 평가가 없습니다. 사용자가 분석 결과에 👍·👎를 누르면 여기에 모입니다.",
+    "👍 좋은 평가": "아직 👍 평가가 없습니다. 사용자가 분석 결과에 👍를 누르면 여기에 모입니다.",
+    "👎 낮은 평가": "아직 👎 평가가 없습니다. 사용자가 분석 결과에 👎를 누르면 여기에 모입니다.",
+}
 INITIAL_LOGS = 100
 GAP_LIMIT = 500
 
@@ -175,17 +185,20 @@ def render_dashboard() -> None:
             st.markdown("**프롬프트 버전별 비교**")
             components.version_table(m)
 
-    st.subheader("낮은 평가 사례")
+    st.subheader("사용자 평가 사례")
     if m is not None:
         st.markdown(f"**👎 사유별 개수 · {period}**")
         components.reason_counts(m)
-    st.markdown("**최근 👎 20건** (기간과 상관없이 최신순, 분석별 최신 평가만)")
+    choice = st.radio("평가", list(FEEDBACK_FILTERS), horizontal=True, key=K_FEEDBACK_FILTER,
+                      index=list(FEEDBACK_FILTERS).index(DEFAULT_FEEDBACK_FILTER), label_visibility="collapsed")
+    st.markdown(f"**최근 {FEEDBACK_LIMIT}건** (기간과 상관없이 최신순, 분석별 최신 평가만)")
     try:
-        items = api_get("/admin/feedback", params={"rating": "down", "limit": 20}) or []
+        lists = [api_get("/admin/feedback", params={"rating": r, "limit": FEEDBACK_LIMIT}) or []
+                 for r in FEEDBACK_FILTERS[choice]]
     except ApiError as e:
         show_api_error(e)
     else:
-        components.feedback_cases(items)
+        components.feedback_cases(merge_feedback(lists, FEEDBACK_LIMIT), empty_message=FEEDBACK_EMPTY[choice])
 
 
 PAGES = [

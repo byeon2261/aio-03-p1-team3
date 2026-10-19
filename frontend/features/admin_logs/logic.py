@@ -35,6 +35,30 @@ REASON_LABELS: dict[str, str] = {
     "none": "사유 안 고름",
 }
 
+# 사용자 평가 사례 필터: 라벨 → 서버에 물을 rating 목록(전체는 👍·👎를 각각 받아 합친다)
+FEEDBACK_FILTERS: dict[str, tuple[str, ...]] = {
+    "전체": ("up", "down"),
+    "👍 좋은 평가": ("up",),
+    "👎 낮은 평가": ("down",),
+}
+DEFAULT_FEEDBACK_FILTER = "전체"
+RATING_LABELS: dict[str, str] = {"up": "👍", "down": "👎"}
+
+
+def merge_feedback(lists: list[list[dict]], limit: int) -> list[dict]:
+    """rating별로 받은 평가 목록을 합쳐 최신순 limit건. 같은 id는 한 번만."""
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for items in lists:
+        for x in items or []:
+            key = str(x.get("id"))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(x)
+    merged.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    return merged[:limit]
+
 
 def period_range(label: str, now: dt.datetime | None = None) -> tuple[dt.datetime, dt.datetime]:
     to = (now or dt.datetime.now(UTC)).astimezone(UTC).replace(microsecond=0)
