@@ -7,7 +7,7 @@
 "재시작 후 기록 유지"는 자동으로 하지 않는다(docs/DEMO_CHECKLIST.md의 수동 절차).
 
 입력(환경변수)
-    API_BASE_URL            예: https://house-tour-notes-api.onrender.com
+    API_BASE_URL            예: https://house-tour-notes-api-6bb5.onrender.com
     SMOKE_USER_EMAIL        테스트 계정(일반 사용자)
     SMOKE_USER_PASSWORD
     SMOKE_ADMIN_EMAIL       운영자 계정(profiles.role = 'admin')

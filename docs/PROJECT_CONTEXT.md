@@ -59,7 +59,7 @@
 - 불편: 집마다 적은 메모가 흩어져 있고 형식이 달라 비교가 어렵고, 꼭 물어봐야 할 항목을 놓친다.
 - 해결: 메모를 입력하면 AI(Gemini, `gemini-3.5-flash-lite` 무료 등급)가 보증금·월세·관리비·장단점·체크리스트 9개 항목(채광·소음·수압·곰팡이·난방·층수·옵션·보안·교통)을 정해진 JSON으로 정리하고, 매물 비교표와 빠진 확인 항목을 보여 준다.
 - 구성: 화면 Streamlit(`frontend/`) · 서버 FastAPI(`backend/`) · DB·인증·사진 Supabase · 초안·캐시·실시간 로그 Redis 호환 저장소.
-- 배포: 서버 Render(`https://house-tour-notes-api.onrender.com`), 화면 Streamlit Community Cloud(`https://aio-03-p1-team3-xqmxzsnatycg7fxy9agfvg.streamlit.app/`). 무료 서버는 잠들어 있으면 첫 요청이 최대 1분 걸린다.
+- 배포: 서버 Render(`https://house-tour-notes-api-6bb5.onrender.com`), 화면 Streamlit Community Cloud(`https://aio-03-p1-team3-xqmxzsnatycg7fxy9agfvg.streamlit.app/`). 무료 서버는 잠들어 있으면 첫 요청이 최대 1분 걸린다.
 - 화면(사이드바: 세션 · 발품 후기 · 전체 매물 · 마이페이지, 상세 화면과 후기 쓰기는 버튼으로 가고 '←' 버튼으로 돌아감): 세션 목록 → 세션 상세(메모 입력·매물 지도·예산·항목 가중치·비교표·적합도 순위) → 매물 상세(분석 결과·수정·평가·사진·항목 만족도·위치) → 마이페이지(내 정보·내 사진·요약·가중치 프로필·내 발품 후기) / 발품 후기 목록 → 발품 후기 쓰기(등록하면 목록으로) / 전체 매물(지도) / 운영자 전용: 운영 대시보드(실시간 로그·지표·피드백 목록), 개선 전후 비교.
 
 ## 3. 현재 상태 (2026-10-18 기준)
