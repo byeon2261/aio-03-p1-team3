@@ -211,11 +211,12 @@ def test_no_listings_keeps_empty_message(fake):
     fake.responses[f"/sessions/{SID}/listings"] = []
     at = _app()
     assert not _cards(at)
-    assert any("아직 매물이 없어요" in str(m.value) and "#new-memo" in str(m.value) for m in at.markdown)  # 빈 화면 카드
+    assert any("아직 매물이 없어요" in str(m.value) for m in at.markdown)               # 빈 화면 카드
+    assert any(b.label == "첫 집 메모 적기" for b in at.button)                       # 누르면 새 메모 모달
     assert f"/sessions/{SID}/comparison" not in fake.calls
 
 
-# ------------------------------------------------------------------ 새 매물 메모·세션 관리 펼침 상자
+# ------------------------------------------------------------------ 새 매물 메모 모달·세션 관리 펼침 상자
 LAYOUT = f"""
 import sys
 sys.path.insert(0, {str(FRONTEND_DIR)!r})
@@ -230,9 +231,15 @@ def _get(path, params=None, **kw):
         return fake.responses[path]
     raise ApiError(404, "DRAFT_NOT_FOUND", "없음")
 
+def _post(path, json=None, **kw):
+    fake.calls.append(("POST", path, json))
+    return {{"id": "new", "label": "5번 집"}}
+
 sections.api_get = _get
+sections.api_post = _post
 listing_map.api_get = _get
 memo_editor.api_get = _get
+memo_editor.api_put = lambda path, json=None, **kw: {{"saved_at": None}}
 session = {{"id": "{SID}", "title": "토요일", "listing_count": fake.count}}
 for sec in sections.SECTIONS:
     if sec["slot"] == "session_detail":
@@ -257,17 +264,45 @@ def test_session_sections_order_and_expanders(fake):
     assert orders == [10, 90]                                   # 세션 관리는 맨 아래(비교표 30·순위 35 뒤)
     at = _layout_app(fake, count=4)
     labels = [e.label for e in at.expander]
-    assert labels == ["새 매물 메모 추가", "세션 관리"]
-    assert [e.proto.expanded for e in at.expander] == [False, False]       # 매물이 있으면 둘 다 접힘
+    assert labels == ["세션 관리"]                               # 화면 안 메모 입력 펼침 상자는 없앴다
+    assert [e.proto.expanded for e in at.expander] == [False]
+    assert not at.text_area                                      # 메모 입력칸은 모달을 열어야 보인다
+    assert f"p1_new_memo_open:{SID}" in {b.key for b in at.button}       # '매물' 제목 오른쪽 버튼
     assert "세션 제목·방문일 수정" not in labels                # 안쪽 펼침 상자 없이 세션 관리에 묶음
     assert f"p1_delete_session:{SID}" in {b.key for b in at.button}
 
 
-def test_new_memo_expander_open_when_no_listings(fake):
+def test_new_memo_button_opens_modal_and_saves(fake):
+    at = _layout_app(fake, count=4)
+    at.button(key=f"p1_new_memo_open:{SID}").click().run()
+    assert not at.exception, at.exception
+    assert [t.label for t in at.text_area] == ["이번 집 메모"]           # 모달 안 메모 입력칸
+    assert {f"p1_memo:save_btn:new:{SID}", f"p1_memo:draft_btn:new:{SID}"} <= {b.key for b in at.button}
+    # 모달 안 클릭은 모달(fragment)만 다시 그린다. AppTest는 앱 전체를 다시 돌려 모달이 닫히므로
+    # 저장 동작은 아래 test_save_new_memo_posts_and_flashes에서 함수로 확인한다.
+
+
+def test_save_new_memo_posts_and_flashes(monkeypatch):
+    import streamlit as st
+    from features.sessions import sections
+
+    calls = []
+    monkeypatch.setattr(sections, "api_post",
+                        lambda path, json=None, **kw: calls.append((path, json)) or {"id": "n", "label": "5번 집"})
+    flashed = []
+    monkeypatch.setattr(sections, "flash", lambda where, msg, kind="success": flashed.append((where, msg)))
+    assert sections._save_new_memo(SID, "보증금 500 월세 40") == ""       # 모달 안에는 문구를 남기지 않는다
+    assert calls == [(f"/sessions/{SID}/listings", {"memo_text": "보증금 500 월세 40"})]
+    assert flashed[0][0] == "session_detail" and "5번 집을(를) 저장했습니다" in flashed[0][1]
+
+
+def test_first_memo_button_opens_modal_when_no_listings(fake):
     fake.responses[f"/sessions/{SID}/listings"] = []
     at = _layout_app(fake, count=0)
-    assert any("첫 집 메모 적기" in str(m.value) for m in at.markdown)
-    assert at.expander[0].label == "새 매물 메모 추가" and at.expander[0].proto.expanded   # 매물 0개면 펼침
+    assert not at.text_area
+    next(b for b in at.button if b.label == "첫 집 메모 적기").click().run()
+    assert not at.exception, at.exception
+    assert [t.label for t in at.text_area] == ["이번 집 메모"]
 
 
 def test_session_manage_stays_open_while_confirming_delete(fake):
