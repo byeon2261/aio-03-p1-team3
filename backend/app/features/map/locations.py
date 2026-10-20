@@ -10,7 +10,7 @@ from typing import Any
 
 from app.core.analysis_contract import needs_reanalysis
 from app.core.db import Database, UniqueViolation
-from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
+from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label, overrides_from_rows
 from app.core.values import MONEY_FIELDS, effective_values
 from app.features.map.schemas import (
     ListingLocationOut, LocationIn, LocationOut, MyPinOut, MyPinsOut, SessionPinOut,
@@ -58,8 +58,45 @@ def money_of(db: Database, listing_id: Any) -> dict[str, Any]:
     success = latest_analysis(db, listing_id)
     if success is None:
         return {"analyzed": False}
-    values = effective_values(success.get("result_json"), field_overrides(db, success["id"]))
+    return _money(success, field_overrides(db, success["id"]))
+
+
+def _money(success: dict | None, overrides: dict[str, Any]) -> dict[str, Any]:
+    if success is None:
+        return {"analyzed": False}
+    values = effective_values(success.get("result_json"), overrides)
     return {"analyzed": True, **{k: values.get(k) for k in MONEY_FIELDS}}
+
+
+def _analyses_of(db: Database, listing_ids: list[str]) -> dict[str, tuple[dict | None, dict | None]]:
+    """{listing_id: (최신 분석, 최신 성공 분석)}. 핀마다 latest_analysis를 따로 부르던 것을 한 번의 조회로."""
+    out: dict[str, tuple[dict | None, dict | None]] = {lid: (None, None) for lid in listing_ids}
+    if not listing_ids:
+        return out
+    for a in db.select("analyses", {"listing_id": listing_ids}, order_by="created_at", desc=True):
+        lid = str(a.get("listing_id"))
+        if lid not in out:
+            continue
+        newest, success = out[lid]
+        out[lid] = (newest or a, success or (a if a.get("status") == "success" else None))
+    return out
+
+
+def _overrides_of(db: Database, analysis_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """{analysis_id: 필드별 최신 수정값}. field_overrides를 분석마다 부르던 것을 한 번의 조회로(같은 규칙)."""
+    if not analysis_ids:
+        return {}
+    by_analysis: dict[str, list[dict]] = {aid: [] for aid in analysis_ids}
+    for r in db.select("feedback", {"analysis_id": analysis_ids}, order_by="created_at"):
+        by_analysis.setdefault(str(r.get("analysis_id")), []).append(r)
+    return {aid: overrides_from_rows(rows) for aid, rows in by_analysis.items()}
+
+
+def _pin_analyses(db: Database, listing_ids: list[str]) -> tuple[dict, dict]:
+    """핀을 그릴 매물들의 (분석 {listing_id: (최신, 최신 성공)}, 수정값 {analysis_id: …}). 조회는 두 번."""
+    analyses = _analyses_of(db, listing_ids)
+    success_ids = [str(s["id"]) for _, s in analyses.values() if s is not None]
+    return analyses, _overrides_of(db, success_ids)
 
 
 def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
@@ -69,13 +106,16 @@ def session_pins(db: Database, session_id: Any) -> list[SessionPinOut]:
         return []
     rows = db.select(TABLE, {"listing_id": [str(x["id"]) for x in listings]})
     by_listing = {str(r["listing_id"]): r for r in rows}
+    analyses, overrides = _pin_analyses(db, [str(x["id"]) for x in listings if str(x["id"]) in by_listing])
     pins = []
     for listing in sorted(listings, key=lambda x: int(x["listing_no"])):
         row = by_listing.get(str(listing["id"]))
         if row:
+            _, success = analyses[str(listing["id"])]
+            money = _money(success, overrides.get(str(success["id"]), {}) if success else {})
             pins.append(SessionPinOut(listing_id=str(listing["id"]), listing_no=int(listing["listing_no"]),
                                       label=label_of(listing), location=LocationOut.model_validate(row),
-                                      **money_of(db, listing["id"])))
+                                      **money))
     return pins
 
 
@@ -95,17 +135,19 @@ def my_pins(db: Database, profile_id: Any) -> MyPinsOut:
     by_session: dict[str, list[dict]] = {}
     for listing in listings:
         by_session.setdefault(str(listing["session_id"]), []).append(listing)
+    analyses, overrides = _pin_analyses(db, [str(x["id"]) for x in listings if str(x["id"]) in by_listing])
     pins = []
     for session in sessions:
         for listing in sorted(by_session.get(str(session["id"]), []), key=lambda x: int(x["listing_no"])):
             row = by_listing.get(str(listing["id"]))
             if row:
-                newest = latest_analysis(db, listing["id"], status=None)
+                newest, success = analyses[str(listing["id"])]
+                money = _money(success, overrides.get(str(success["id"]), {}) if success else {})
                 pins.append(MyPinOut(listing_id=str(listing["id"]), listing_no=int(listing["listing_no"]),
                                      label=label_of(listing), location=LocationOut.model_validate(row),
                                      session_id=str(session["id"]), session_title=session.get("title") or "",
                                      memo_text=listing.get("memo_text") or "",
                                      analysis_status=(newest or {}).get("status") or "none",
                                      needs_reanalysis=needs_reanalysis(listing, newest),
-                                     **money_of(db, listing["id"])))
+                                     **money))
     return MyPinsOut(pins=pins, listing_count=len(listings))

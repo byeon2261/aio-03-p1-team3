@@ -29,7 +29,20 @@ NAME_REQUIRED = "매물 이름을 입력하세요."
 
 
 def listing_out(db: Database, row: dict) -> ListingOut:
-    latest = latest_analysis(db, row["id"], status=None)
+    return _to_listing_out(row, latest_analysis(db, row["id"], status=None))
+
+
+def _newest_analyses(db: Database, listing_ids: list[str]) -> dict[str, dict]:
+    """{listing_id: 최신 분석(성공·실패 상관없이)}. 매물마다 latest_analysis를 부르던 것을 한 번의 조회로."""
+    if not listing_ids:
+        return {}
+    out: dict[str, dict] = {}
+    for a in db.select("analyses", {"listing_id": listing_ids}, order_by="created_at", desc=True):
+        out.setdefault(str(a.get("listing_id")), a)
+    return out
+
+
+def _to_listing_out(row: dict, latest: dict | None) -> ListingOut:
     status = (latest or {}).get("status") or "none"
     return ListingOut(
         id=str(row["id"]),
@@ -48,7 +61,9 @@ def listing_out(db: Database, row: dict) -> ListingOut:
 def list_session_listings(session_id: str, user: CurrentUser = Depends(get_current_user),
                           db: Database = Depends(get_user_db)) -> list[ListingOut]:
     session = get_owned_session(db, user, session_id)
-    return [listing_out(db, r) for r in list_listings(db, session["id"])]
+    rows = list_listings(db, session["id"])
+    newest = _newest_analyses(db, [str(r["id"]) for r in rows])
+    return [_to_listing_out(r, newest.get(str(r["id"]))) for r in rows]
 
 
 @router.post("/sessions/{session_id}/listings", response_model=ListingOut)
