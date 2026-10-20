@@ -1,4 +1,4 @@
-"""F11 예산 섹션: 세션 상세(session_detail) 슬롯 order 40(적합도 순위 35 아래).
+"""F11 예산 섹션: 세션 상세(session_detail) 슬롯 order 40(항목 가중치 32·적합도 순위 35 아래).
 
 - 보증금 상한·월 고정비 상한(만원) 입력, 저장, 비우기.
 - "예산 안만 보기" 토글 → st.session_state[budget_filter_key(sid)]에 쓴다. 비교표(P3, order 30)·적합도 순위(F12, 35)가 읽는다.

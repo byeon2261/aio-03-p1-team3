@@ -144,8 +144,9 @@ def test_budget_toggle_reaches_sections_above_in_same_click(ui_fake):
     assert ui_fake.seen[-1] is False
 
 
-def test_budget_and_weights_sections_below_ranking():
+def test_weights_above_ranking_and_budget_below():
     from core.loader import load_sections
 
     order = [(s["feature"], s["order"]) for s in load_sections() if s["slot"] == "session_detail"]
-    assert [f for f, _ in order] == ["sessions", "comparison", "scoring", "budget", "scoring", "sessions"]
+    assert [f for f, _ in order] == ["sessions", "comparison", "scoring", "scoring", "budget", "sessions"]
+    assert [o for _, o in order] == [10, 30, 32, 35, 40, 90]          # 항목 가중치 32 → 적합도 순위 35 → 예산 40
