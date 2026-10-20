@@ -340,6 +340,47 @@ memo_editor.render_memo_editor(scope="t", draft_path="/d", on_save=lambda text: 
     assert at.session_state["saved"] == ["메모"]
 
 
+def test_listing_card_pencil_opens_edit_modal(fake):
+    """매물 카드 이름 옆 연필 버튼 → '매물 수정' 모달(이름 칸은 지금 이름, 메모 칸은 저장된 메모)."""
+    at = _layout_app(fake, count=4)
+    pencils = [b for b in at.button if (b.key or "").startswith("p1_edit_listing:")]
+    assert [b.key for b in pencils] == [f"p1_edit_listing:{x['id']}" for x in LISTINGS]
+    assert all(b.help == "이름·메모 수정" for b in pencils)
+    lst = LISTINGS[3]
+    at.button(key=f"p1_edit_listing:{lst['id']}").click().run()
+    assert not at.exception, at.exception
+    name = at.text_input(key=f"p1_edit_listing_name:{lst['id']}")
+    assert name.label == "매물 이름 *" and name.value == lst["label"] and name.max_chars == 30
+    assert [(t.label, t.value) for t in at.text_area] == [("메모", "신축 깔끔")]
+    assert f"p1_memo:save_btn:edit:{lst['id']}" in {b.key for b in at.button}
+    assert f"/listings/{lst['id']}/draft" in fake.calls        # 메모 초안은 매물 상세와 같은 초안
+
+
+def test_save_listing_edit_patches_name_and_memo(monkeypatch):
+    import streamlit as st
+    from features.sessions import sections
+
+    calls = []
+    monkeypatch.setattr(sections, "api_patch", lambda path, json=None, **kw: calls.append((path, json))
+                        or {"label": json["name"], "needs_reanalysis": True})
+    flashed = []
+    monkeypatch.setattr(sections, "flash", lambda where, msg, kind="success": flashed.append((where, msg)))
+    st.session_state["p1_edit_listing_name:l-9"] = " 1번방 "
+    assert sections._save_listing_edit("l-9", "보증금 700") == ""
+    assert calls == [("/listings/l-9", {"name": "1번방", "memo_text": "보증금 700"})]
+    assert flashed == [("session_detail", "1번방을(를) 수정했습니다. 메모가 바뀌었으니 [AI로 정리하기]로 다시 정리하세요.")]
+
+
+def test_memo_editor_forget_clears_remembered_text():
+    import streamlit as st
+    from features.sessions import memo_editor
+
+    st.session_state["p1_memo:text:edit:l-1"] = "고치다 만 메모"
+    st.session_state["p1_memo:state:edit:l-1"] = {"saved_at": None}
+    memo_editor.forget("edit:l-1")
+    assert "p1_memo:text:edit:l-1" not in st.session_state and "p1_memo:state:edit:l-1" not in st.session_state
+
+
 def test_first_memo_button_opens_modal_when_no_listings(fake):
     fake.responses[f"/sessions/{SID}/listings"] = []
     at = _layout_app(fake, count=0)

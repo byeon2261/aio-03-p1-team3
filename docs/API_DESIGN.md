@@ -247,7 +247,7 @@ Content-Type: application/json
 | E13 | `GET /sessions/{session_id}/listings` | 본인 | - | `list[ListingOut]` | `listing_no` 오름차순. 404 `SESSION_NOT_FOUND` |
 | E14 | `POST /sessions/{session_id}/listings` | 본인 | `ListingCreateIn` | `ListingOut` | 매물 이름(`name`, 예: "1번방")은 공백 제거 후 1~30자로 필수(빈 값 422 "매물 이름을 입력하세요."). 메모는 공백 제거 후 1~5000자. `listing_no`는 DB 트리거가 매긴다. 저장 성공 시 그 세션의 새 매물 초안을 지운다. 404 `SESSION_NOT_FOUND` |
 | E15 | `GET /listings/{listing_id}` | 본인 | - | `ListingOut` | 404 `LISTING_NOT_FOUND`(남의 매물 포함) |
-| E16 | `PATCH /listings/{listing_id}` | 본인 | `ListingUpdateIn` | `ListingOut` | 메모만 고친다(빈 값 422). 메모가 바뀌면 `memo_updated_at` 갱신 → 분석이 있으면 `needs_reanalysis: true`. 그 매물의 초안을 지운다. 404 `LISTING_NOT_FOUND` |
+| E16 | `PATCH /listings/{listing_id}` | 본인 | `ListingUpdateIn` | `ListingOut` | 메모를 고친다(빈 값 422). `name`을 보내면 매물 이름도 고친다(공백 제거 후 1~30자, 빈 값 422 "매물 이름을 입력하세요.", 빼면 그대로. 이름만 바뀌면 재분석 필요가 아니다). 메모가 바뀌면 `memo_updated_at` 갱신 → 분석이 있으면 `needs_reanalysis: true`. 그 매물의 초안을 지운다. 404 `LISTING_NOT_FOUND` |
 | E17 | `DELETE /listings/{listing_id}` | 본인 | - | `OkOut` | 사진 파일 → 초안 → 매물 행. 분석·피드백·사진 행·위치·만족도는 CASCADE. 503 `CLEANUP_FAILED`, 404 `LISTING_NOT_FOUND` |
 
 ```http
@@ -777,6 +777,7 @@ Content-Type: application/json
 | 필드 | 타입 | 필수 | 기본값 | 제약 | 설명 | 예시 |
 |---|---|---|---|---|---|---|
 | `memo_text` | string | 필수 | - | max_length=5000 | 새 메모(빈 값은 422) | `"역 5분, 500/40, 관리비 7, 남향, 수압 좋음"` |
+| `name` | string \| null | 선택 | `null` | max_length=30 | 새 매물 이름. null(생략)이면 이름은 그대로, 보내면 1~30자(빈 값 422). 세션 상세 '매물 수정' 모달이 보낸다 | `"1번방"` |
 
 #### ListingOut — `core/schemas.py`
 

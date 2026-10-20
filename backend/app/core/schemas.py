@@ -89,6 +89,8 @@ class ListingCreateIn(BaseModel):
 
 class ListingUpdateIn(BaseModel):
     memo_text: str = Field(max_length=MEMO_MAX_CHARS)
+    name: str | None = Field(default=None, max_length=30,
+                             description="매물 이름(선택). 보내면 1~30자로 바꾸고, 빼면 그대로 둔다", examples=["1번방"])
 
 
 class ListingOut(BaseModel):

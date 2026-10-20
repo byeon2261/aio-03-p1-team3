@@ -36,6 +36,13 @@ def _reset_key(scope: str) -> str:
     return f"{_PREFIX}reset:{scope}"
 
 
+def forget(scope: str) -> None:
+    """이 입력칸이 기억한 값을 지운다. 다음에 그릴 때 서버 초안(없으면 initial_text)으로 다시 채운다.
+    입력칸을 그리기 전(모달을 여는 버튼을 누른 실행)에 부른다."""
+    for key in (_text_key(scope), _state_key(scope), _reset_key(scope)):
+        st.session_state.pop(key, None)
+
+
 def _state(scope: str) -> dict:
     return st.session_state.setdefault(_state_key(scope), {})
 

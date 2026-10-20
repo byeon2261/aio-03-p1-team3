@@ -20,12 +20,14 @@ import streamlit as st
 from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post
 from core.ui import empty_state, fmt_kst, icon_badge, icon_title, show_api_error
-from features.sessions import analyze_all, summary
+from features.sessions import analyze_all, memo_editor, summary
 from features.sessions.common import flash, parse_date, show_flash, status_next_step
 from features.sessions.memo_editor import render_memo_editor
 from features.map.listing_map import render_session_map
 
 TITLE_MAX_CHARS = 100
+EDIT_LISTING_LABEL = "매물 수정"         # 연필 버튼 모달 제목
+EDIT_LISTING_HELP = "이름·메모 수정"
 NAME_MAX_CHARS = 30                  # listings.name(0009)과 같은 길이
 NAME_LABEL = "매물 이름 *"
 NAME_PLACEHOLDER = "예: 1번방"
@@ -123,11 +125,16 @@ def _no_photo() -> None:
     )
 
 
-def _card_title(label: str, info: str) -> None:
-    """제목(크고 굵게) + 한 줄 정보(작은 회색, 넘치면 …)."""
+def _card_title(lst: dict, info: str) -> None:
+    """제목(크고 굵게) + 바로 옆 연필 버튼(이름·메모 수정 모달) + 한 줄 정보(작은 회색, 넘치면 …)."""
+    with st.container(horizontal=True, vertical_alignment="center", gap="small", key=f"p1_card_title:{lst['id']}"):
+        st.markdown(f'<div style="font-size:1.15rem;font-weight:800;line-height:1.3;color:#110d3c">'
+                    f'{html.escape(lst["label"])}</div>', unsafe_allow_html=True, width="content")
+        if st.button("", key=f"p1_edit_listing:{lst['id']}", icon=":material/edit:", type="tertiary",
+                     help=EDIT_LISTING_HELP):
+            _open_edit_listing(lst)
     st.markdown(
-        f'<div style="font-size:1.15rem;font-weight:800;line-height:1.3;color:#110d3c">{html.escape(label)}</div>'
-        f'<div title="{html.escape(info, quote=True)}" style="font-size:13px;color:{MUTED};margin-top:2px;'
+        f'<div title="{html.escape(info, quote=True)}" style="font-size:13px;color:{MUTED};margin-top:-20px;'
         f'{ONE_LINE}">{html.escape(info)}</div>',
         unsafe_allow_html=True,
     )
@@ -157,7 +164,7 @@ def _listing_card(lst: dict, photos: list[dict] | None = None, row: dict | None 
             else:
                 _no_photo()
         with left:
-            _card_title(lst["label"], summary.info_line(lst, row))
+            _card_title(lst, summary.info_line(lst, row))
             st.markdown(" ".join(summary.chips(lst, row)))
         with right:
             hint = analyze_all.CARD_HINT if analyze_all.needs_analysis(lst) else status_next_step(lst)
@@ -220,6 +227,8 @@ LISTINGS_SPACING_CSS = (
     f"{_ROW}:has({_BTN}):not(:has({_ROW} {_BTN})) [data-testid=\"stMarkdownContainer\"]:has(> .ht-icon-title) "
     "{ margin-bottom: 0 !important; }"
     f"{_ROW}:has({_ROW} {_BTN}):not(:has({_ROW} {_ROW} {_BTN})) {{ margin-top: 1.5rem; }}"
+    # 매물 카드 이름 옆 연필 버튼을 이름과 세로 가운데로(Markdown 상자의 음수 아래 여백 -1rem을 이 줄에서만 0)
+    '[class*="st-key-p1_card_title"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }'
     "</style>"
 )
 
@@ -257,6 +266,45 @@ def _new_memo_dialog(session: dict) -> None:
                            label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
                            on_save=lambda text: _save_new_memo(sid, text), clear_after_save=True,
                            validate=lambda: _name_problem(sid))
+
+    _dialog()
+
+
+def _edit_name_key(lid: str) -> str:
+    return f"p1_edit_listing_name:{lid}"
+
+
+def _save_listing_edit(lid: str, text: str) -> str:
+    name = str(st.session_state.get(_edit_name_key(lid)) or "").strip()
+    updated = api_patch(f"/listings/{lid}", json={"name": name, "memo_text": text})
+    message = f"{updated['label']}을(를) 수정했습니다."
+    if updated.get("needs_reanalysis"):
+        message += " 메모가 바뀌었으니 [AI로 정리하기]로 다시 정리하세요."
+    flash("session_detail", message)   # 저장하면 모달이 닫히고 화면 위쪽에 안내가 보인다
+    return ""
+
+
+def _open_edit_listing(lst: dict) -> None:
+    """연필 버튼: 이름 칸은 지금 이름으로, 메모 칸은 서버(초안 또는 저장된 메모)에서 새로 채우고 모달을 연다."""
+    lid = lst["id"]
+    st.session_state[_edit_name_key(lid)] = lst["label"]
+    memo_editor.forget(f"edit:{lid}")
+    _edit_listing_dialog(lst)
+
+
+def _edit_listing_dialog(lst: dict) -> None:
+    """매물 수정 모달: 새 매물 메모 모달과 같은 모양(이름 칸 + 메모 입력 부품). 메모 초안은 매물 상세와 같은 초안."""
+    lid = lst["id"]
+
+    @st.dialog(EDIT_LISTING_LABEL, width="large")
+    def _dialog() -> None:
+        st.text_input(NAME_LABEL, key=_edit_name_key(lid), max_chars=NAME_MAX_CHARS, placeholder=NAME_PLACEHOLDER,
+                      help="비교표·순위·지도에 이 이름으로 보입니다.")
+        render_memo_editor(scope=f"edit:{lid}", draft_path=f"/listings/{lid}/draft",
+                           initial_text=lst.get("memo_text") or "", label="메모", placeholder=MEMO_PLACEHOLDER,
+                           save_label="수정 저장", on_save=lambda text: _save_listing_edit(lid, text),
+                           validate=lambda: None if str(st.session_state.get(_edit_name_key(lid)) or "").strip()
+                           else NAME_REQUIRED)
 
     _dialog()
 
