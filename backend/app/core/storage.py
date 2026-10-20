@@ -49,6 +49,23 @@ class SupabaseStorage:
             raise StorageError("signed_url failed: empty")
         return url
 
+    def signed_urls(self, paths: list[str], ttl_sec: int, access_token: str) -> dict[str, str | None]:
+        """여러 경로의 서명 URL을 한 번에 만든다. {path: url}. 그 경로만 실패하면 값이 None.
+
+        Protocol에는 없는 선택 기능이다. 없는 저장소는 signed_url을 한 장씩 부른다(features/photos/service.py).
+        """
+        if not paths:
+            return {}
+        try:
+            res = self._bucket(access_token).create_signed_urls(list(paths), int(ttl_sec))
+        except Exception as exc:
+            raise StorageError(f"signed_urls failed: {type(exc).__name__}") from None
+        out: dict[str, str | None] = {}
+        for item in res or []:
+            url = None if item.get("error") else (item.get("signedURL") or item.get("signedUrl"))
+            out[item.get("path")] = url or None
+        return out
+
     def delete(self, paths: list[str], access_token: str) -> None:
         if not paths:
             return

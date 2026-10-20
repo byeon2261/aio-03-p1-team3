@@ -23,6 +23,8 @@ logger = logging.getLogger("app.features.photos")
 ALLOWED_TYPES: dict[str, str] = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 # Storage 삭제 한 번에 보낼 경로 수
 DELETE_CHUNK = 100
+# 서명 URL 한 번에 만들 경로 수
+SIGN_CHUNK = 100
 
 
 def max_photo_bytes() -> int:
@@ -75,8 +77,40 @@ def _signed(storage: Storage, path: str, access_token: str) -> tuple[str | None,
         return None, None
 
 
-def to_photo_out(row: dict[str, Any], storage: Storage, access_token: str) -> PhotoOut:
-    url, expires_at = _signed(storage, row["storage_path"], access_token)
+def signed_many(storage: Storage, rows: list[dict[str, Any]],
+                access_token: str) -> dict[str, tuple[str | None, dt.datetime | None]]:
+    """사진 여러 장의 (서명 URL, 만료 시각). {storage_path: …}. 결과는 _signed를 한 장씩 부른 것과 같다.
+
+    저장소에 signed_urls가 있으면 SIGN_CHUNK 장씩 묶어 한 번에 만든다(사진마다 Storage를 따로 부르지 않게).
+    묶음 호출이 실패하면 그 묶음만 한 장씩 다시 만든다.
+    """
+    paths = list(dict.fromkeys(r["storage_path"] for r in rows))
+    batch = getattr(storage, "signed_urls", None)
+    if batch is None:
+        return {p: _signed(storage, p, access_token) for p in paths}
+    ttl = int(settings.SIGNED_URL_TTL_SEC)
+    out: dict[str, tuple[str | None, dt.datetime | None]] = {}
+    for i in range(0, len(paths), SIGN_CHUNK):
+        chunk = paths[i:i + SIGN_CHUNK]
+        expires_at = dt.datetime.now(dt.timezone.utc) + dt.timedelta(seconds=ttl)  # 호출 전 시각 기준(보수적)
+        try:
+            urls = batch(chunk, ttl, access_token)
+        except StorageError as exc:
+            logger.warning("signed_urls failed: %s (count=%d)", exc, len(chunk))
+            out.update({p: _signed(storage, p, access_token) for p in chunk})
+            continue
+        for p in chunk:
+            url = urls.get(p)
+            if url is None:
+                logger.warning("signed_url failed: missing in batch")
+            out[p] = (url, expires_at) if url else (None, None)
+    return out
+
+
+def to_photo_out(row: dict[str, Any], storage: Storage, access_token: str,
+                 signed: tuple[str | None, dt.datetime | None] | None = None) -> PhotoOut:
+    """signed: signed_many로 미리 만든 (URL, 만료 시각). 없으면 여기서 한 장만 만든다."""
+    url, expires_at = signed if signed is not None else _signed(storage, row["storage_path"], access_token)
     return PhotoOut(
         id=str(row["id"]),
         listing_id=str(row["listing_id"]),
@@ -90,8 +124,9 @@ def to_photo_out(row: dict[str, Any], storage: Storage, access_token: str) -> Ph
 
 
 def to_my_photo_out(row: dict[str, Any], listing: dict[str, Any], session: dict[str, Any],
-                    storage: Storage, access_token: str) -> MyPhotoOut:
-    base = to_photo_out(row, storage, access_token)
+                    storage: Storage, access_token: str,
+                    signed: tuple[str | None, dt.datetime | None] | None = None) -> MyPhotoOut:
+    base = to_photo_out(row, storage, access_token, signed)
     return MyPhotoOut(
         **base.model_dump(),
         session_id=str(session["id"]),
