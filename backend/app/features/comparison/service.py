@@ -5,6 +5,7 @@
     values           최신 '성공' 분석의 result_json → 사용자 수정값(field_overrides) → effective_values
                      최신이 실패여도 이전 성공 값이 있으면 그 값을 쓴다. 성공 분석이 없으면 {}.
 금액 None은 '미기재'이고 0으로 바꾸지 않는다. 최저값 비교에서도 뺀다.
+분석·수정값은 매물마다 따로 묻지 않고 세션 매물 전체를 한 번에 읽는다(_load_analyses, _load_overrides).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from typing import Any, Iterable
 from app.core.analysis_contract import CHECKLIST, needs_reanalysis
 from app.core.ownership import get_owned_session
 from app.core.registry import ColumnValue, get_column_providers, get_row_filter
-from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
+from app.core.repo import list_listings, listing_label, overrides_from_rows
 from app.core.schemas import ComparisonOut, ComparisonRow, FieldTitle
 from app.core.values import effective_values, monthly_cost
 
@@ -68,18 +69,42 @@ def full_values(result_json: dict | None, overrides: dict | None) -> dict[str, A
     return values
 
 
-def _base_row(db: Any, listing: dict) -> dict:
+def _load_analyses(db: Any, listing_ids: list[str]) -> dict[str, tuple[dict | None, dict | None]]:
+    """{listing_id: (최신 분석, 최신 성공 분석)}. 매물마다 latest_analysis를 두 번 부르던 것을 한 번의 조회로."""
+    out: dict[str, tuple[dict | None, dict | None]] = {lid: (None, None) for lid in listing_ids}
+    if not listing_ids:
+        return out
+    for row in db.select("analyses", {"listing_id": listing_ids}, order_by="created_at", desc=True):
+        lid = str(row.get("listing_id"))
+        if lid not in out:
+            continue
+        newest, success = out[lid]
+        if newest is None:
+            newest = row
+        if success is None and row.get("status") == "success":
+            success = row
+        out[lid] = (newest, success)
+    return out
+
+
+def _load_overrides(db: Any, analysis_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """{analysis_id: 필드별 최신 수정값}. field_overrides를 분석마다 부르던 것을 한 번의 조회로(같은 규칙)."""
+    if not analysis_ids:
+        return {}
+    by_analysis: dict[str, list[dict]] = {aid: [] for aid in analysis_ids}
+    for row in db.select("feedback", {"analysis_id": analysis_ids}, order_by="created_at"):
+        by_analysis.setdefault(str(row.get("analysis_id")), []).append(row)
+    return {aid: overrides_from_rows(rows) for aid, rows in by_analysis.items()}
+
+
+def _base_row(listing: dict, newest: dict | None, success: dict | None, overrides: dict[str, dict]) -> dict:
     lid = str(listing["id"])
-    newest = latest_analysis(db, lid, status=None)
+    status = "none" if newest is None else (newest.get("status") or "failed")
     if newest is None:
-        status = "none"
         success = None
-    else:
-        status = newest.get("status") or "failed"
-        success = newest if status == "success" else latest_analysis(db, lid)
     values: dict[str, Any] = {}
     if success is not None:
-        values = full_values(success.get("result_json"), field_overrides(db, success["id"]))
+        values = full_values(success.get("result_json"), overrides.get(str(success["id"]), {}))
     return {
         "listing_id": lid,
         "listing_no": int(listing.get("listing_no") or 0),
@@ -88,6 +113,14 @@ def _base_row(db: Any, listing: dict) -> dict:
         "needs_reanalysis": needs_reanalysis(listing, newest),
         "values": values,
     }
+
+
+def _base_rows(db: Any, listings: list[dict]) -> list[dict]:
+    """매물 N곳의 기본 행. DB 조회는 분석 1번 + 수정값 1번(매물이 없으면 0번)."""
+    analyses = _load_analyses(db, [str(x["id"]) for x in listings])
+    success_ids = [str(s["id"]) for _, s in analyses.values() if s is not None]
+    overrides = _load_overrides(db, success_ids)
+    return [_base_row(x, *analyses[str(x["id"])], overrides) for x in listings]
 
 
 def _as_column_value(v: Any) -> ColumnValue | None:
@@ -146,7 +179,7 @@ def _lowest(rows: list[dict]) -> dict[str, list[str]]:
 def build_comparison(db: Any, user: Any, session_id: Any, filter_names: Iterable[str] = ()) -> ComparisonOut:
     session = get_owned_session(db, user, session_id)
     sid = str(session["id"])
-    rows = [_base_row(db, listing) for listing in list_listings(db, sid)]
+    rows = _base_rows(db, list_listings(db, sid))
     fields = [FieldTitle(key=k, title=t) for k, t in FIELDS]
 
     def _out_row(r: dict, cols: dict | None = None) -> ComparisonRow:

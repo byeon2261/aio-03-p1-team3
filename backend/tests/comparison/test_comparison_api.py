@@ -288,3 +288,30 @@ def test_comparison_other_user_raises_404(memory_db, make_user):
 def test_comparison_parse_filters():
     assert parse_filters(None) == []
     assert parse_filters(" within_budget, ,within_budget,x ") == ["within_budget", "x"]
+
+
+def test_comparison_reads_analyses_and_feedback_once(memory_db, make_user):
+    """매물이 늘어도 분석·수정값 조회는 한 번씩(매물마다 따로 묻지 않는다)."""
+    alice = make_user()
+    s = make_session(memory_db, alice)
+    for i in range(5):
+        lst = make_listing(memory_db, s, f"메모 {i}")
+        a = add_success(memory_db, lst, monthly_rent_manwon=40 + i)
+        add_override(memory_db, alice, a, "deposit_manwon", 100 + i)
+    add_failed(memory_db, lst)                        # 마지막 매물은 최신이 실패
+    tables: list[str] = []
+    original = memory_db.select
+
+    def counting(table, *args, **kwargs):
+        tables.append(table)
+        return original(table, *args, **kwargs)
+
+    memory_db.select = counting
+    try:
+        out = build_comparison(memory_db, alice, s["id"])
+    finally:
+        memory_db.select = original
+    assert tables.count("analyses") == 1 and tables.count("feedback") == 1
+    rows = _rows_by_no(out)
+    assert [rows[n].values["deposit_manwon"] for n in range(1, 6)] == [100, 101, 102, 103, 104]
+    assert rows[5].analysis_status == "failed" and rows[5].values["monthly_rent_manwon"] == 44
