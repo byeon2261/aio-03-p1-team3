@@ -69,17 +69,39 @@ def _previous_block(aid: str, lid: str, analysis: dict) -> None:
             st.rerun()
 
 
+# 매물 상세 위쪽(분석 섹션 P2)이 같은 화면 실행에서 받아 둔 최신 분석: (분석 | None, ApiError | None).
+# 분석 전(ANALYSIS_NOT_FOUND)이면 (None, None). 같은 API를 한 번 더 부르지 않으려고 같이 쓴다.
+SHARED_LATEST = "_analysis_latest"
+
+
+def _latest(ctx: dict, lid: str) -> dict | None:
+    """최신 분석. 화면에 이미 받아 둔 것이 있으면 그것을, 없으면 직접 부른다. 분석 전이면 None, 그 밖의 오류는 던진다."""
+    if SHARED_LATEST in ctx:
+        analysis, error = ctx[SHARED_LATEST]
+        if error is not None:
+            raise error
+        return analysis
+    try:
+        return api_get(f"/listings/{lid}/analyses/latest")
+    except ApiError as e:
+        if e.status == 404:
+            return None
+        raise
+
+
 def render_feedback(ctx: dict) -> None:
     listing = ctx["listing"]
     lid = listing["id"]
     try:
-        analysis = api_get(f"/listings/{lid}/analyses/latest")
+        analysis = _latest(ctx, lid)
     except ApiError as e:
         if e.status == 404:
             return  # 분석 전: 섹션 숨김
         icon_title("rate_review", "AI 결과 수정·피드백")
         show_api_error(e)
         return
+    if analysis is None:
+        return  # 분석 전: 섹션 숨김
 
     icon_title("rate_review", "AI 결과 수정·피드백")
     flash = st.session_state.pop(f"fb_flash:{lid}", None)
