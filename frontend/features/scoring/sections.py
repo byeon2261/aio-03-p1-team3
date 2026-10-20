@@ -13,7 +13,7 @@ import streamlit as st
 
 from core.api import ApiError, api_delete, api_get, api_post, api_put
 from core.state import budget_filter_key
-from core.ui import fmt_kst, show_api_error
+from core.ui import fmt_kst, icon_title, notify, show_api_error
 from features.scoring.view import (
     RULE_NOTE, SATISFACTION_NOTE, hidden_message, profile_label, profile_options, profiles_markdown, ranking_markdown,
     satisfaction_body, weights_body, weights_summary,
@@ -51,6 +51,7 @@ def _show_flash(scope: str) -> None:
     msg = st.session_state.pop(_flash_key(scope), None)
     if msg:
         st.success(msg)
+        notify(msg)
 
 
 def _retry_button(key: str) -> None:
@@ -204,7 +205,7 @@ def render_scoring_settings(ctx: dict) -> None:
     if not sid:
         return
     with st.container(border=True):
-        st.subheader("항목 가중치")
+        icon_title("tune", "항목 가중치")
         _show_flash(sid)
         _show_flash("profiles")
         profiles = _load_profiles()
@@ -250,13 +251,13 @@ def render_ranking(ctx: dict) -> None:
         with st.spinner("적합도를 계산하는 중…"):
             data = api_get(f"/sessions/{sid}/scores", params=params)
     except ApiError as e:
-        st.subheader("적합도 순위")
+        icon_title("emoji_events", "적합도 순위")
         show_api_error(e)
         _retry_button(f"scoring_rank_retry:{sid}")
         return
     if not (data.get("setting") or {}).get("enabled", True):
         return   # 꺼져 있으면 순위를 보여 주지 않는다
-    st.subheader("적합도 순위")
+    icon_title("emoji_events", "적합도 순위")
     setting = data.get("setting") or {}
     st.caption(f"가중치 프로필: {setting.get('weight_profile_name') or '선택 안 함 (모든 항목 같은 가중치)'}")
     hidden = hidden_message(data) if filter_on else None
@@ -305,7 +306,7 @@ def render_satisfaction(ctx: dict) -> None:
     if not lid:
         return
     with st.container(border=True):
-        st.subheader("항목 만족도")
+        icon_title("tune", "항목 만족도")
         _show_flash(lid)
         data = _load_satisfaction(lid)
         if data is None:
@@ -335,5 +336,5 @@ def render_satisfaction(ctx: dict) -> None:
 SECTIONS = [
     {"slot": "session_detail", "order": 25, "render": render_scoring_settings},
     {"slot": "session_detail", "order": 35, "render": render_ranking},
-    {"slot": "listing_detail", "order": 45, "render": render_satisfaction},
+    {"slot": "listing_detail", "order": 45, "area": "score", "render": render_satisfaction},   # '내 점수' 탭
 ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 import streamlit as st
 
 from core.api import ApiError, api_get, api_post
-from core.ui import show_api_error
+from core.ui import icon_title, notify, show_api_error
 from features.comparison.cells import (
     EDIT_FIELDS, EDIT_TITLES, NULLABLE_EDIT_KEYS, REASON_LABELS, REASONS, correction_entry, kind_of,
     pending_previous, plain_value,
@@ -62,7 +62,7 @@ def _previous_block(aid: str, lid: str, analysis: dict) -> None:
     if not pending:
         return
     names = ", ".join(EDIT_TITLES[k] for k in pending)
-    st.info(f"이전 분석에서 직접 고친 값이 있습니다({names}). 누르기 전에는 이번 분석에 들어가지 않습니다.")
+    st.caption(f"이전 분석에서 직접 고친 값이 있습니다({names}). 누르기 전에는 이번 분석에 들어가지 않습니다.")
     if st.button(f"이전 수정 {len(pending)}개 적용", key=_key(aid, "apply_prev")):
         body = {"corrections": [{"field_name": k, "action": "set", "corrected_value": v} for k, v in pending.items()]}
         if _post(aid, lid, body):
@@ -77,14 +77,15 @@ def render_feedback(ctx: dict) -> None:
     except ApiError as e:
         if e.status == 404:
             return  # 분석 전: 섹션 숨김
-        st.subheader("AI 결과 수정·피드백")
+        icon_title("rate_review", "AI 결과 수정·피드백")
         show_api_error(e)
         return
 
-    st.subheader("AI 결과 수정·피드백")
+    icon_title("rate_review", "AI 결과 수정·피드백")
     flash = st.session_state.pop(f"fb_flash:{lid}", None)
     if flash:
         st.success(flash)
+        notify("수정·평가를 저장했어요")
     if analysis.get("status") != "success":
         st.caption("최근 분석이 실패해 고칠 값이 없습니다. 분석을 다시 실행한 뒤 고치거나 평가하세요.")
         return

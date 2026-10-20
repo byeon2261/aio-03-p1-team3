@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from core.api import ApiError, api_delete
-from core.ui import fmt_kst, show_api_error
+from core.ui import fmt_kst, notify, show_api_error
 
 ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp"]
 MAX_PHOTO_MB = 10          # 서버 settings.MAX_PHOTO_MB와 같게 둔다(서버가 최종 검사)
@@ -27,6 +27,7 @@ def show_flash(scope: str) -> None:
     msg = st.session_state.pop(flash_key(scope), None)
     if msg:
         st.success(msg)
+        notify(msg)
 
 
 def set_flash(scope: str, message: str) -> None:

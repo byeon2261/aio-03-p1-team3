@@ -14,7 +14,7 @@ from typing import Any, Callable
 import streamlit as st
 
 from core.api import ApiError, api_get, api_put
-from core.ui import fmt_kst, show_api_error
+from core.ui import fmt_kst, notify, show_api_error
 
 MEMO_MAX_CHARS = 5000
 AUTOSAVE_HINT = "다른 곳을 누르거나 Ctrl+Enter를 누르면 자동 저장됩니다. 임시 저장본은 24시간 보관됩니다."
@@ -151,6 +151,7 @@ def render_memo_editor(*, scope: str, draft_path: str, initial_text: str = "", l
     message = st.session_state.pop(f"{_PREFIX}saved:{scope}", None)
     if message:
         st.success(message)
+        notify("메모를 저장했어요")
     if _fragment_fn is None:
         _fragment_fn = st.fragment(_editor_body)
     _fragment_fn(scope=scope, draft_path=draft_path, initial_text=initial_text, label=label,

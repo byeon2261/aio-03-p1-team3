@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import streamlit as st
 
 from core import state
@@ -9,12 +11,22 @@ from core.api import ApiError, api_post
 from core.ui import show_api_error
 
 PAGES: list[dict] = []
+LOGO = Path(__file__).resolve().parents[2] / "assets" / "golabang_logo.png"
+INTRO = "집 보고 적은 메모를 AI가 비교표로 정리해 드려요"
 
 
 def render_login() -> None:
-    st.title("집 보기 메모 비교")
-    st.caption("오늘 본 집들의 메모를 정리하고 나란히 비교하세요.")
+    _, center, _ = st.columns([1, 2, 1])
+    with center:
+        if LOGO.exists():
+            st.image(str(LOGO), width=240)
+        else:
+            st.title("골라방")
+        st.markdown(f":gray[{INTRO}]")
+        _login_form()
 
+
+def _login_form() -> None:
     mode = st.radio("모드", ["로그인", "회원가입"], horizontal=True, label_visibility="collapsed", key="auth_mode")
     notice = st.session_state.pop("_auth_notice", None)
     if notice:

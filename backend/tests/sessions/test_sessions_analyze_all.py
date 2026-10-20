@@ -1,4 +1,4 @@
-"""세션 화면 [AI 정리](frontend/features/sessions/analyze_all): 대상 고르기 + Streamlit AppTest. 서버는 가짜."""
+"""세션 화면 [AI로 정리하기](frontend/features/sessions/analyze_all): 대상 고르기 + Streamlit AppTest. 서버는 가짜."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def _app():
 
 def test_button_analyzes_only_targets_and_reports(ui_fake):
     at = _app()
-    assert at.button[0].label == "AI 정리" and not at.button[0].disabled
+    assert at.button[0].label == "AI로 정리하기" and not at.button[0].disabled
     at.button[0].click().run()
     assert ui_fake.calls == [("/listings/1/analyses", {"use_cache": True}),
                              ("/listings/3/analyses", {"use_cache": True})]

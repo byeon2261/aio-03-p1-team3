@@ -9,7 +9,7 @@ import datetime as dt
 import streamlit as st
 
 from core.api import ApiError, api_delete, api_get, api_patch, api_post, api_put
-from core.ui import fmt_kst, show_api_error
+from core.ui import empty_state, fmt_kst, notify, show_api_error
 from features.community.view import (
     BODY_MAX, FLOOR_OPTIONS, PHOTO_EXTS, REASONS, TITLE_MAX, TOPICS, ADDRESS_MAX, PRIVACY_NOTICE,
     DEFAULT_SORT, LIKE_HELP, OWN_POST_LIKE_NOTE, SORTS, UNLIKE_HELP,
@@ -28,6 +28,7 @@ def show_flash(scope: str) -> None:
     msg = st.session_state.pop(FLASH_KEY.format(scope=scope), None)
     if msg:
         st.success(msg)
+        notify(msg)
 
 
 def show_error(e: ApiError) -> None:
@@ -74,7 +75,7 @@ def post_card(post: dict, scope: str) -> None:
         c1.markdown(f"**{title}**" + ("  `내 글`" if post.get("is_mine") else ""))
         c1.caption(meta_line(post))
         c1.caption(like_mark(post))
-        if c2.button("자세히", key=f"balpum_open:{scope}:{post['id']}", width="stretch"):
+        if c2.button("자세히 보기 →", key=f"balpum_open:{scope}:{post['id']}", type="tertiary", width="stretch"):
             open_post(scope, post["id"])
             st.rerun()
 
@@ -214,10 +215,16 @@ def _like_controls(post: dict, scope: str) -> None:
     st.rerun()
 
 
-def render_post_list(posts: list[dict], scope: str, empty_message: str, *, sort_key: str | None = None) -> None:
-    """sort_key를 주면 '후기 N개' 옆에 [최신순 / 좋아요 많은순]을 보여 준다(값은 그 key의 session_state)."""
+def render_post_list(posts: list[dict], scope: str, empty_message: str, *, sort_key: str | None = None,
+                     on_write=None) -> None:
+    """sort_key를 주면 '후기 N개' 옆에 [최신순 / 좋아요 많은순]을 보여 준다(값은 그 key의 session_state).
+
+    on_write를 주면 빈 목록 카드에 [발품 후기 쓰기] 버튼을 두고 누르면 on_write()를 부른다.
+    """
     if not posts:
-        st.info(empty_message)
+        if empty_state("forum", empty_message, button="발품 후기 쓰기" if on_write else None,
+                       key=f"balpum_empty_write:{scope}") and on_write:
+            on_write()
         return
     if sort_key is None:
         st.caption(f"후기 {len(posts)}개 · 최신순")

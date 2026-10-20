@@ -75,6 +75,7 @@ def test_analysis_frontend_button_state(listing, analysis, show, label):
 
 
 # ------------------------------------------------------------------ AppTest
+# 매물 상세의 'AI 정리' 네 자리(actions·notice·overview·summary)를 화면 순서대로, 같은 ctx로 그린다
 SCRIPT = f"""
 import sys
 sys.path.insert(0, {str(FRONTEND_DIR)!r})
@@ -99,7 +100,11 @@ def _post(path, **kw):
 
 sections.api_get = _get
 sections.api_post = _post
-sections.SECTIONS[0]["render"]({{"listing": fake.listing, "session": {{"id": "s1", "title": "토요일"}}}})
+ctx = {{"listing": fake.listing, "session": {{"id": "s1", "title": "토요일"}}, "comparison_row": fake.row}}
+for area in ("actions", "notice", "overview", "summary"):
+    for sec in sections.SECTIONS:
+        if sec.get("area") == area:
+            sec["render"](ctx)
 """
 
 
@@ -108,6 +113,7 @@ def ui_fake():
     mod = types.ModuleType("_analysis_ui_fake")
     mod.calls, mod.latest, mod.after_post, mod.post_error = [], None, None, None
     mod.listing = {"id": LID, "memo_text": "메모 있음", "needs_reanalysis": False}
+    mod.row = {"values": {"monthly_cost_manwon": 57}}
     sys.modules["_analysis_ui_fake"] = mod
     yield mod
     sys.modules.pop("_analysis_ui_fake", None)
@@ -127,37 +133,57 @@ def _texts(at):
     for kind in ("markdown", "caption", "info", "warning", "error", "success", "subheader"):
         out += [e.value for e in getattr(at, kind)]
     out += [f"{m.label}={m.value}" for m in at.metric]
+    out += [c.label for c in at.checkbox] + [e.label for e in at.expander]
     return "\n".join(str(x) for x in out)
+
+
+def test_analysis_frontend_sections_have_areas():
+    from features.analysis import sections
+
+    assert [(s["area"], s["order"]) for s in sections.SECTIONS] == [
+        ("actions", 20), ("notice", 21), ("overview", 22), ("summary", 23)]
 
 
 def test_analysis_frontend_empty_state_and_run(ui_fake):
     at = _run()
-    assert "아직 정리하지 않았습니다" in _texts(at)
-    assert [b.label for b in at.button] == ["AI로 정리하기"]
+    assert "아직 정리 전이에요" in _texts(at) and "내 메모" not in _texts(at)   # 메모 미리보기 없음
+    assert [(b.label, b.key) for b in at.button] == [("AI로 정리하기", f"analysis_run_{LID}")]   # 카드 안 버튼만
     ui_fake.after_post = _analysis()
     at.button[0].click().run()
     texts = _texts(at)
     assert ("POST", f"/listings/{LID}/analyses") in ui_fake.calls
     assert "정리했습니다" in texts and "보증금=500만원" in texts and "월세 ✎=50만원" in texts
-    assert at.button == [] or all(b.label != "AI로 정리하기" for b in at.button)
+    assert "월 고정비=57만원" in texts                                           # 비교표 응답의 월 고정비
+    assert [b.label for b in at.button] == ["다시 정리"] and at.button[0].disabled
 
 
 def test_analysis_frontend_memo_empty_disables_button(ui_fake):
     ui_fake.listing = {"id": LID, "memo_text": "  "}
     at = _run()
-    assert "메모가 비어 있습니다" in _texts(at) and at.button[0].disabled
+    assert "메모가 비어 있어요" in _texts(at) and at.button[0].disabled
 
 
-def test_analysis_frontend_result_card(ui_fake):
+def test_analysis_frontend_result_summary(ui_fake):
     ui_fake.latest = _analysis()
     at = _run()
     t = _texts(at)
-    for s in ("관리비=7만원", "관리비 포함: 인터넷", "**층**  \n미기재", "신림역 도보 8분", "남향",
-              "**확인됨** · 2", "**미확인** · 1", "**모호함** · 1", "**미기재** · 5",
-              "“수압 확인 못함”", "“조용한 듯?”", "“관리비 별도”",
-              "샤워기와 세면대를 함께 틀어도 수압이 괜찮나요?"):
+    for s in ("관리비=7만원", "관리비 포함: 인터넷", "미기재", "신림역 도보 8분", "남향",
+              "확인됨", "모호함", "미확인", "미기재", ":green-badge[채광]", ":gray-badge[난방]",
+              "“수압 확인 못함”", "“조용한 듯?”", "“관리비 별도”", "근거 문장 보기",
+              "다음 방문 때 물어볼 것", "**수압** · 샤워기와 세면대를 함께 틀어도 수압이 괜찮나요?"):
         assert s in t, s
-    assert at.warning == [] and at.button == []
+    assert "2번 집" not in t                                                  # 카드 안 중복 제목 없음
+    assert len(at.checkbox) == 7 and any(e.label == "+3개 더 보기" for e in at.expander)   # 4개 + 더 보기
+    assert at.warning == []
+    assert [b.label for b in at.button] == ["다시 정리"] and at.button[0].disabled   # 메모 그대로면 비활성
+    assert at.button[0].help == "메모를 고치면 다시 정리할 수 있어요"
+
+
+def test_analysis_frontend_status_line_order(ui_fake):
+    ui_fake.latest = _analysis()
+    at = _run()
+    line = next(str(m.value) for m in at.markdown if "확인됨" in str(m.value) and "-badge[" in str(m.value))
+    assert line.index("확인됨") < line.index("모호함") < line.index("미확인") < line.index("미기재")
 
 
 def test_analysis_frontend_mixed_listings_warning(ui_fake):
@@ -166,12 +192,13 @@ def test_analysis_frontend_mixed_listings_warning(ui_fake):
     assert logic.MIXED_LISTINGS_MESSAGE in [w.value for w in at.warning]
 
 
-def test_analysis_frontend_failed_shows_retry(ui_fake):
+def test_analysis_frontend_failed_shows_card(ui_fake):
     ui_fake.latest = _analysis(status="failed", error_code="FMT", fields={}, checks=[], confirmed_checks=[],
                                unchecked=[], ambiguous_checks=[], missing_checks=[])
     at = _run()
-    assert "형식이 맞지 않아" in at.error[0].value
-    assert [b.label for b in at.button] == ["다시 시도"]
+    t = _texts(at)
+    assert "정리하지 못했어요" in t and "형식이 맞지 않아" in t
+    assert [b.label for b in at.button] == ["AI로 정리하기"] and not at.button[0].disabled
 
 
 def test_analysis_frontend_post_error_message(ui_fake):
@@ -188,7 +215,7 @@ def test_analysis_frontend_needs_reanalysis(ui_fake):
     ui_fake.latest = _analysis(needs_reanalysis=True)
     at = _run()
     assert any("메모가 바뀌었습니다" in w.value for w in at.warning)
-    assert [b.label for b in at.button] == ["다시 분석"]
+    assert [b.label for b in at.button] == ["다시 분석"] and not at.button[0].disabled
 
 
 def test_analysis_frontend_network_error(ui_fake):
@@ -197,3 +224,4 @@ def test_analysis_frontend_network_error(ui_fake):
     ui_fake.latest = ApiError(0, "NETWORK_ERROR", "연결 실패")
     at = _run()
     assert any("서버에 연결할 수 없습니다" in w.value for w in at.warning)
+    assert at.button == []

@@ -6,12 +6,12 @@ import streamlit as st
 
 from core import nav, state
 from core.api import ApiError, api_get
-from core.ui import show_api_error
+from core.ui import icon_title, show_api_error
 from features.comparison.cells import (
     BUDGET_FILTER, COST_NOTE, comparison_markdown, hidden_message, needs_action,
 )
 
-TITLE_HELP = "💡 관리비가 비싸도 **포함 내역**이 많으면 더 쌀 수 있어요.  \n'미기재'는 집주인에게 꼭 물어보세요."
+TITLE_HELP = "관리비가 비싸도 **포함 내역**이 많으면 더 쌀 수 있어요.  \n'미기재'는 집주인에게 꼭 물어보세요."
 
 
 def _action_hint(rows: list[dict]) -> None:
@@ -22,14 +22,15 @@ def _action_hint(rows: list[dict]) -> None:
     cols = st.columns(min(len(todo), 4))
     for i, r in enumerate(todo):
         with cols[i % len(cols)]:
-            if st.button(f"{r['label']} 열기", key=f"cmp_open:{r['listing_id']}", width="stretch"):
+            if st.button(f"{r['label']} 상세 보기 →", key=f"cmp_open:{r['listing_id']}", type="tertiary",
+                         width="stretch"):
                 nav.go_listing_detail(r["listing_id"])
 
 
 def render_comparison(ctx: dict) -> None:
     session = ctx["session"]
     sid = session["id"]
-    st.subheader("매물 비교표", help=TITLE_HELP)
+    icon_title("table_chart", "매물 비교표", help=TITLE_HELP)
 
     filter_on = bool(st.session_state.get(state.budget_filter_key(sid)))
     params = {"filters": BUDGET_FILTER} if filter_on else None

@@ -52,6 +52,14 @@ def feed_table(rows: list[dict], *, total: int) -> None:
     st.dataframe(data, hide_index=True, width="stretch", height=360)
 
 
+NO_DATA = "데이터 없음"
+
+
+def _v(text: str) -> str:
+    """지표 값이 '데이터 없음'이면 작은 회색 글씨로(st.metric 값은 마크다운을 받는다)."""
+    return f":small[:gray[{NO_DATA}]]" if text == NO_DATA else text
+
+
 def metric_cards(m: dict) -> None:
     ex = m.get("extra") or {}
     fe = ex.get("field_edit") or {}
@@ -59,7 +67,7 @@ def metric_cards(m: dict) -> None:
     row1 = st.columns(4)
     row1[0].metric("요청 수", f"{m.get('request_count', 0):,}건",
                    help="기간 안의 업무 요청 수. /admin 요청은 '운영자 요청 포함'을 켤 때만 셉니다.")
-    row1[1].metric("실패율", fmt_pct(m.get("error_rate")),
+    row1[1].metric("실패율", _v(fmt_pct(m.get("error_rate"))),
                    help=f"상태 코드 400 이상 ÷ 전체 요청 ({ex.get('error_count', 0)}건 실패)")
     row1[2].metric("처리 시간 중앙값", fmt_ms(m.get("p50_latency_ms")), help="latency_ms 중앙값")
     row1[3].metric("처리 시간 상위 5%", fmt_ms(m.get("p95_latency_ms")),
@@ -67,13 +75,13 @@ def metric_cards(m: dict) -> None:
     row2 = st.columns(4)
     row2[0].metric("AI 시간 중앙값", fmt_ms(m.get("ai_p50_latency_ms")),
                    help=f"ai_latency_ms가 있는 요청 {ex.get('ai_request_count', 0)}건의 중앙값")
-    row2[1].metric("캐시 적중률", fmt_pct(m.get("cache_hit_rate")),
+    row2[1].metric("캐시 적중률", _v(fmt_pct(m.get("cache_hit_rate"))),
                    help=f"cache_hit True ÷ 분석 요청({ex.get('analysis_request_count', 0)}건)")
-    row2[2].metric("필드 수정 비율", fmt_pct(fe.get("ratio")),
+    row2[2].metric("필드 수정 비율", _v(fmt_pct(fe.get("ratio"))),
                    help=(f"사용자가 고친 상태로 남은 필드 {fe.get('edited_fields', 0)}개 ÷ 분석된 필드 "
                          f"{fe.get('analyzed_fields', 0)}개. 'AI 값으로 되돌리기'한 필드는 빼고 '메모에 없음'으로 "
                          f"고친 필드는 셉니다. 사용자가 고친 빈도이며 정답과 비교한 값이 아닙니다."))
-    row2[3].metric("👎 비율", fmt_pct(rating.get("down_rate")),
+    row2[3].metric("👎 비율", _v(fmt_pct(rating.get("down_rate"))),
                    help=f"👎 {rating.get('down_count', 0)}건 ÷ 전체 평가 {rating.get('rating_count', 0)}건(분석별 최신 평가)")
     st.caption(f"형식 실패 비율 {fmt_pct(m.get('format_error_rate'))} "
                f"(AI 응답 형식 실패 ÷ 분석 요청) · 집계 기간 {m.get('window_minutes', 0):,}분")
@@ -134,9 +142,11 @@ def reason_counts(m: dict) -> None:
     if total == 0:
         st.caption("이 기간에 👎 평가가 없습니다.")
         return
-    cols = st.columns(len(REASON_LABELS))
-    for col, (key, label) in zip(cols, REASON_LABELS.items()):
-        col.metric(label, f"{counts.get(key, 0)}건")
+    items = list(REASON_LABELS.items())
+    for start in range(0, len(items), 4):   # 한 줄에 4개씩
+        cols = st.columns(4)
+        for col, (key, label) in zip(cols, items[start:start + 4]):
+            col.metric(label, f"{counts.get(key, 0)}건")
 
 
 def feedback_cases(items: list[dict], *, empty_message: str) -> None:

@@ -6,6 +6,8 @@ import datetime as dt
 
 import streamlit as st
 
+from core.ui import notify
+
 _FLASH_PREFIX = "p1_flash:"
 
 # latest_analysis_status → (표시, 다음에 할 일)
@@ -28,6 +30,8 @@ def show_flash(where: str) -> None:
         return
     kind, message = item
     {"success": st.success, "info": st.info, "warning": st.warning}.get(kind, st.info)(message)
+    if kind == "success":
+        notify(message)
 
 
 def status_text(listing: dict) -> str:

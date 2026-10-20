@@ -14,7 +14,7 @@ import streamlit as st
 
 from core import state
 from core.api import ApiError, api_get, base_url
-from core.ui import show_api_error
+from core.ui import icon_title, show_api_error
 from features.admin_logs import components
 from features.admin_logs.logic import (
     ALL_VERSIONS,
@@ -167,11 +167,12 @@ def render_dashboard() -> None:
 
     period, status, version, include_admin = _filters()
 
-    st.subheader("실시간 로그")
+    icon_title("monitoring", "실시간 로그")
     _live_feed(include_admin, status, version)
 
     head, btn = st.columns([4, 1])
-    head.subheader(f"지표 · {period}")
+    with head:
+        icon_title("insights", f"지표 · {period}")
     btn.button("지표 새로 고침", key="admin_logs_refresh_metrics", width="stretch")   # 누르면 다시 실행되며 새로 계산
     m = _load_metrics(period, version, include_admin)
     if m is not None:
@@ -185,9 +186,9 @@ def render_dashboard() -> None:
             st.markdown("**프롬프트 버전별 비교**")
             components.version_table(m)
 
-    st.subheader("사용자 평가 사례")
+    icon_title("rate_review", "사용자 평가 사례")
     if m is not None:
-        st.markdown(f"**👎 사유별 개수 · {period}**")
+        st.markdown(f":orange[:material/thumb_down:] **사유별 개수 · {period}**")
         components.reason_counts(m)
     choice = st.radio("평가", list(FEEDBACK_FILTERS), horizontal=True, key=K_FEEDBACK_FILTER,
                       index=list(FEEDBACK_FILTERS).index(DEFAULT_FEEDBACK_FILTER), label_visibility="collapsed")

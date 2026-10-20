@@ -1,0 +1,259 @@
+/* 화면 전체 공통 스타일 — app.py가 한 번 불러온다(st.html, Streamlit 1.65).
+ *
+ * 색·글꼴·기본 모서리는 .streamlit/config.toml [theme]에서 정하고, 여기서는 테마 키로 못 정하는
+ * 카드 그림자·여백·탭·헤더만 다룬다. 기준은 docs/SCREEN_DESIGN.md 3절.
+ *
+ * 선택자 규칙: Streamlit 내부 클래스명(.st-emotion-cache-…, .e1abc…)은 버전마다 바뀌므로 쓰지 않는다.
+ * data-testid와 ARIA/상태 속성(aria-current, data-selected)만 쓴다.
+ *
+ * 카드: 1.65에는 "테두리 있는 컨테이너"만 고르는 data-testid가 없다. st.container()는 모두
+ * stLayoutWrapper 바로 아래 stVerticalBlock으로 그려지므로 그 조합을 카드로 본다.
+ * 그래서 이 저장소에서는 st.container()를 카드 용도로만, 항상 border=True로 쓴다.
+ */
+
+:root {
+  --ht-card-bg: #ffffff;
+  --ht-card-radius: 16px;
+  --ht-card-pad: 1.25rem 1.5rem;
+  --ht-card-shadow: 0 1px 2px rgba(17, 13, 60, 0.04), 0 4px 16px rgba(17, 13, 60, 0.06);
+  --ht-card-border: #e3e8f2;
+  --ht-accent: #3246d3;
+  --ht-accent-soft: #eaeefc;
+  --ht-muted: #64636d;
+}
+
+/* ---------------------------------------------------------------- 개발 도구 티 지우기 */
+/* 헤더는 숨기지 않는다: 사이드바 열기 버튼(stExpandSidebarButton)이 헤더 안에 있다 */
+[data-testid="stHeader"] {
+  background: transparent;
+}
+[data-testid="stAppDeployButton"] {
+  display: none;
+}
+
+/* 본문 최대 폭·위아래 여백 (전체 매물 지도 페이지는 자기 CSS의 !important로 여백을 없앤다) */
+[data-testid="stMainBlockContainer"] {
+  max-width: 1200px;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+/* ---------------------------------------------------------------- 글꼴 굵기 대비 */
+[data-testid="stMain"] h1 {
+  font-size: 2.2rem;
+  letter-spacing: -0.02em;
+}
+[data-testid="stMain"] [data-testid="stHeading"] h2,
+[data-testid="stMain"] [data-testid="stHeading"] h3 {
+  letter-spacing: -0.01em;
+  font-size: 1.375rem;
+}
+[data-testid="stWidgetLabel"] p {
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- 카드 */
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stMain"] [data-testid="stForm"],
+[data-testid="stMain"] [data-testid="stMetric"] {
+  background: var(--ht-card-bg);
+  border: 1px solid var(--ht-card-border);
+  border-radius: var(--ht-card-radius);
+  box-shadow: var(--ht-card-shadow);
+}
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"],
+[data-testid="stMain"] [data-testid="stForm"] {
+  padding: var(--ht-card-pad);
+}
+
+/* 펼침 상자: 테두리를 가진 안쪽 상자(머리 + stExpanderDetails)를 카드로.
+ * :has()를 못 읽는 브라우저에서도 위 규칙이 버려지지 않도록 따로 둔다. */
+[data-testid="stMain"] [data-testid="stExpander"] > :has(> [data-testid="stExpanderDetails"]) {
+  background: var(--ht-card-bg);
+  border-color: var(--ht-card-border);
+  border-radius: var(--ht-card-radius);
+  box-shadow: var(--ht-card-shadow);
+}
+
+/* 카드 안의 카드(예: 펼침 상자 안의 폼, 카드 안의 지표)는 그림자 없이 평평하게 */
+[data-testid="stMain"] :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stExpander"])
+  :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stMetric"]) {
+  box-shadow: none;
+}
+[data-testid="stMain"] :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stForm"], [data-testid="stExpander"])
+  [data-testid="stExpander"] > :has(> [data-testid="stExpanderDetails"]) {
+  box-shadow: none;
+}
+
+/* 카드에 마우스를 올리면 그림자를 조금 진하게 */
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"] {
+  transition: box-shadow 0.15s ease;
+}
+[data-testid="stMain"] [data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"]:hover {
+  box-shadow: 0 2px 4px rgba(17, 13, 60, 0.05), 0 10px 24px rgba(17, 13, 60, 0.09);
+}
+
+/* 지표 카드(st.metric) */
+[data-testid="stMain"] [data-testid="stMetric"] {
+  padding: 1.125rem 1.375rem;
+}
+[data-testid="stMetricValue"] {
+  font-size: 2rem;
+  letter-spacing: -0.02em;
+}
+[data-testid="stMetricLabel"] p {
+  font-weight: 600;
+  color: var(--ht-muted);
+}
+
+/* ---------------------------------------------------------------- 탭: 글자 + 강조색 밑줄 */
+[data-testid="stTab"] {
+  color: var(--ht-muted);
+  font-weight: 500;
+}
+[data-testid="stTab"][data-selected] {
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- 버튼 */
+:is([data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"],
+    [data-testid="stBaseButton-primaryFormSubmit"], [data-testid="stBaseButton-secondaryFormSubmit"]) {
+  min-height: 2.5rem;
+  padding-inline: 1rem;
+  font-weight: 600;
+}
+:is([data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"]):not(:disabled) {
+  box-shadow: 0 2px 6px rgba(50, 70, 211, 0.25);
+}
+
+/* 본문의 글자형 버튼(type="tertiary", 예: 매물 카드 [상세 보기 →])은 강조색 글자 */
+[data-testid="stMain"] [data-testid="stBaseButton-tertiary"] {
+  color: var(--ht-accent);
+  font-weight: 600;
+}
+[data-testid="stMain"] [data-testid="stBaseButton-tertiary"]:hover {
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------- 사이드바 메뉴 */
+/* 바탕색은 config.toml [theme.sidebar]. 선택한 메뉴는 흰 알약 + 옅은 그림자 + 강조색 글자·아이콘 */
+[data-testid="stSidebarNavItems"] {
+  gap: 0.375rem;
+  padding-inline: 0.5rem;
+}
+[data-testid="stSidebarNavLink"] {
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+/* 메뉴 글자 15.5px, 아이콘도 같은 크기 */
+[data-testid="stSidebarNavLink"] span {
+  font-size: 15.5px;
+}
+[data-testid="stSidebarNavLink"] [data-testid="stIconMaterial"] {
+  font-size: 20px;
+}
+/* 묶음 제목(내 집 보기·계정·운영): 작은 회색 */
+[data-testid="stNavSectionHeader"] {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a8fa3;
+  padding-inline: 0.75rem;
+  margin-top: 0.75rem;
+}
+[data-testid="stSidebarNavLink"]:hover {
+  background: rgba(50, 70, 211, 0.06);
+}
+[data-testid="stSidebarNavLink"] span {
+  color: var(--ht-muted);
+  font-weight: 500;
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] span {
+  font-weight: 800;
+}
+[data-testid="stSidebarNavLink"] [data-testid="stIconMaterial"] {
+  color: #8a8fa3;
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(17, 13, 60, 0.04), 0 4px 12px rgba(17, 13, 60, 0.06);
+}
+[data-testid="stSidebarNavLink"][aria-current="page"] span,
+[data-testid="stSidebarNavLink"][aria-current="page"] [data-testid="stIconMaterial"] {
+  color: var(--ht-accent);
+  font-weight: 800;
+}
+/* 메뉴와 사용자 영역 사이 구분선은 옅게 */
+[data-testid="stSidebarNavSeparator"] {
+  opacity: 0.45;
+}
+/* 아래 사용자 영역: 이름 + 글자형 [로그아웃] */
+[data-testid="stSidebarUserContent"] [data-testid="stBaseButton-tertiary"] {
+  padding-inline: 0;
+  color: var(--ht-muted);
+  font-weight: 500;
+}
+[data-testid="stSidebarUserContent"] [data-testid="stBaseButton-tertiary"]:hover {
+  color: var(--ht-accent);
+}
+
+/* ---------------------------------------------------------------- 마크다운 표(매물 비교표·적합도 순위 등 st.markdown 표 공통) */
+/* 폭 100%, 흰 바탕, 연한 머리글 바탕·굵게, 옅은 행 구분선(세로 줄 없음) */
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] table {
+  width: 100%;
+  background: var(--ht-card-bg);
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--ht-card-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] :is(th, td) {
+  border: none;
+  border-bottom: 1px solid #eef1f6;
+  padding: 0.625rem 0.75rem;
+  word-break: keep-all;          /* 한국어 낱말이 글자 단위로 세로로 끊기지 않게 */
+}
+/* 열이 많아 칸에 안 들어가면 표만 가로로 스크롤 */
+[data-testid="stMain"] [data-testid="stMarkdownContainer"]:has(> table) {
+  overflow-x: auto;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] th {
+  background: #f5f7fc;
+  font-weight: 700;
+  color: var(--ht-muted);
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---------------------------------------------------------------- 오류·주의 안내: 빨간·노란 상자 대신 차분한 색 */
+[data-testid="stMain"] [data-testid="stAlertContainer"]:has(> [data-testid="stAlertContentError"]) {
+  background: #F4F5F9;
+  color: #3d4152;
+  border-left: 3px solid #8A8FA3;
+}
+[data-testid="stMain"] [data-testid="stAlertContainer"]:has(> [data-testid="stAlertContentWarning"]) {
+  background: #FBF7EE;
+  color: #5b4a24;
+  border-left: 3px solid #D9B66A;
+}
+
+/* 빈 화면 카드(core/ui.py empty_state): 가운데 정렬 */
+[data-testid="stMain"] [class*="st-key-ht_empty_"] {
+  text-align: center;
+}
+
+/* 카드 안의 폼은 테두리·여백 없이(예: 예산 카드 안 입력 폼의 이중 테두리 제거) */
+[data-testid="stMain"] :is([data-testid="stLayoutWrapper"] > [data-testid="stVerticalBlock"], [data-testid="stExpander"])
+  [data-testid="stForm"] {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+/* 마크다운 표 첫 두 열(매물·상태)은 한 줄로 */
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] :is(th, td):nth-child(-n+2) {
+  white-space: nowrap;
+}

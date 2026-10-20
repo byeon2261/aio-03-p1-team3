@@ -66,3 +66,49 @@ def test_listing_detail_has_back_to_session(fake):
 def test_detail_pages_hidden_from_sidebar():
     src = (FRONTEND_DIR / "app.py").read_text(encoding="utf-8")
     assert src.count('"hidden": True') == 2 and 'visibility="hidden" if p.get("hidden")' in src
+
+
+def _tab_labels(at) -> list[str]:
+    return [t.label for t in at.tabs]
+
+
+def test_listing_detail_tabs_follow_analysis_state(fake):
+    fake.responses["/listings/l1"] = {**LISTING, "latest_analysis_status": "success"}
+    at = _app("host_pages.render_listing_detail()")
+    assert _tab_labels(at) == [":material/description: 요약", ":material/edit_note: 메모",
+                               ":material/rate_review: 수정·평가", ":material/photo_camera: 사진·위치",
+                               ":material/tune: 내 점수"]
+    assert any("분석 완료" in str(m.value) and "<h1" in str(m.value) for m in at.markdown)   # 제목 옆 칩
+    assert any("토요일 집 보기 · 메모 수정" in c.value for c in at.caption)
+
+    fake.responses["/listings/l1"] = {**LISTING, "latest_analysis_status": "failed"}
+    at = _app("host_pages.render_listing_detail()")
+    assert _tab_labels(at) == [":material/edit_note: 메모 고치기", ":material/photo_camera: 사진·위치",
+                               ":material/tune: 내 점수"]
+
+
+def test_listing_detail_budget_chip_from_comparison(fake):
+    fake.responses["/sessions/s1/comparison"] = {"rows": [
+        {"listing_id": "l1", "columns": {"budget": {"status": "over"}}, "values": {}}]}
+    at = _app("host_pages.render_listing_detail()")
+    assert any("예산 초과" in str(m.value) for m in at.markdown)
+
+
+def test_render_slot_filters_by_area():
+    if str(FRONTEND_DIR) not in sys.path:
+        sys.path.append(str(FRONTEND_DIR))
+    from core import slots
+
+    seen = []
+    slots.register_sections([
+        {"slot": "listing_detail", "order": 2, "area": "memo", "render": lambda ctx: seen.append("memo")},
+        {"slot": "listing_detail", "order": 1, "render": lambda ctx: seen.append("main")},
+        {"slot": "listing_detail", "order": 3, "area": "menu", "render": lambda ctx: seen.append("menu")},
+    ])
+    try:
+        assert [s["order"] for s in slots.sections_for("listing_detail")] == [1, 2, 3]
+        slots.render_slot("listing_detail", {}, area="memo")
+        slots.render_slot("listing_detail", {}, area="main")        # "area"가 없으면 main
+        assert seen == ["memo", "main"]
+    finally:
+        slots.register_sections([])

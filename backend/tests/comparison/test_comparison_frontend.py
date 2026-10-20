@@ -40,7 +40,7 @@ def ui_fake():
 
 
 def test_title_help_text():
-    assert comparison_table.TITLE_HELP.startswith("💡 관리비가 비싸도 **포함 내역**이 많으면 더 쌀 수 있어요.")
+    assert comparison_table.TITLE_HELP.startswith("관리비가 비싸도 **포함 내역**이 많으면 더 쌀 수 있어요.")
     assert "'미기재'는 집주인에게 꼭 물어보세요." in comparison_table.TITLE_HELP
 
 
@@ -50,8 +50,7 @@ def test_comparison_title_has_help_and_includes_column(ui_fake):
     at = AppTest.from_string(SCRIPT, default_timeout=10)
     at.run()
     assert not at.exception, at.exception
-    title = at.subheader[0]
-    assert title.value == "매물 비교표"
-    assert title.proto.help == comparison_table.TITLE_HELP
+    assert any("매물 비교표" in str(m.value) and "table_chart" in str(m.value) for m in at.markdown)   # 아이콘 제목
+    assert comparison_table.TITLE_HELP in [c.value for c in at.caption]          # 도움말은 제목 아래 회색 한 줄
     table = next(m.value for m in at.markdown if m.value.startswith("| 매물"))
     assert "포함 내역" in table.splitlines()[0] and "인터넷, 수도" in table
