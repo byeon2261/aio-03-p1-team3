@@ -54,7 +54,7 @@ def test_budget_unknown_lines():
 
 
 def test_comparison_hidden_message_points_to_budget_section():
-    assert cells.hidden_message({"hidden_count": {"within_budget": 4}}) == "4건 숨김 · 사유는 위 '예산' 섹션에서 확인"
+    assert cells.hidden_message({"hidden_count": {"within_budget": 4}}) == "4건 숨김 · 사유는 아래 '예산' 섹션에서 확인"
     assert cells.hidden_message({"hidden_count": {}}) is None
 
 
@@ -78,6 +78,8 @@ def _put(path, json=None, **kw):
 sections.api_get, sections.api_put = _get, _put
 if fake.filter_on and budget_filter_key("{SID}") not in st.session_state:
     st.session_state[budget_filter_key("{SID}")] = True
+# 비교표(30)·적합도 순위(35)처럼 예산(40)보다 위에서 필터 값을 읽는 섹션 흉내
+fake.seen.append(bool(st.session_state.get(budget_filter_key("{SID}"))))
 sections.render_budget({{"session": {{"id": "{SID}", "title": "토요일"}}}})
 """
 
@@ -85,7 +87,7 @@ sections.render_budget({{"session": {{"id": "{SID}", "title": "토요일"}}}})
 @pytest.fixture
 def ui_fake():
     mod = types.ModuleType("_budget_ui_fake")
-    mod.calls, mod.filter_on = [], True
+    mod.calls, mod.filter_on, mod.seen = [], True, []
     mod.responses = {
         f"/sessions/{SID}/budget": {"session_id": SID, "deposit_max_manwon": 1000, "monthly_max_manwon": 55,
                                     "updated_at": "2026-10-17T07:00:00+00:00"},
@@ -128,3 +130,22 @@ def test_budget_ui_filter_off_does_not_call_evaluations(ui_fake):
     at = _app()
     assert "숨김" not in _texts(at)
     assert ("GET", f"/sessions/{SID}/budget/evaluations") not in ui_fake.calls
+
+
+def test_budget_toggle_reaches_sections_above_in_same_click(ui_fake):
+    """예산은 비교표·순위보다 아래(order 40)에 그려진다. 토글을 바꾼 그 실행에서 위쪽이 새 값을 읽어야 한다."""
+    ui_fake.filter_on = False
+    at = _app()
+    assert ui_fake.seen[-1] is False
+    at.toggle(key=f"budget_toggle:{SID}").set_value(True).run()
+    assert not at.exception, at.exception
+    assert ui_fake.seen[-1] is True                 # 콜백이 화면을 그리기 전에 값을 옮겼다
+    at.toggle(key=f"budget_toggle:{SID}").set_value(False).run()
+    assert ui_fake.seen[-1] is False
+
+
+def test_budget_and_weights_sections_below_ranking():
+    from core.loader import load_sections
+
+    order = [(s["feature"], s["order"]) for s in load_sections() if s["slot"] == "session_detail"]
+    assert [f for f, _ in order] == ["sessions", "comparison", "scoring", "budget", "scoring", "sessions"]

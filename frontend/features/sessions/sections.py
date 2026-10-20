@@ -2,7 +2,8 @@
 
 - session_detail (order 10): 맨 위 요약 숫자 카드(본 집·예산 안·확인 필요·최저 월 고정비), 매물 카드 목록
   (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[상세 보기 →]), 오른쪽 열에 'AI 정리' 제목 + '정리 안 된 매물 N곳' 배너
-  ([AI로 정리하기])와 F13 매물 지도, 그 아래 '새 매물 메모 추가' 펼침 상자(매물이 없으면 펼친 상태).
+  ([AI로 정리하기])와 F13 매물 지도. '매물' 제목 오른쪽 [새 매물 메모] 버튼(매물이 없으면 빈 화면 카드의 버튼)을
+  누르면 모달 창에 메모 입력칸이 뜬다(화면 안에 따로 두던 메모 입력 펼침 상자는 없앴다).
 - session_detail (order 90): 페이지 맨 아래 '세션 관리' 펼침 상자(아이콘 settings)(세션 제목·방문일 수정, 세션 삭제).
   요약 숫자·카드 숫자·예산 칩은 같은 화면의 비교표가 쓰는 GET /sessions/{id}/comparison 응답에서 만든다(summary.py).
 - listing_detail (order 10): [⋯] 팝오버 안 [매물 삭제] → 같은 팝오버 안 삭제 확인(menu), 한 번짜리 안내(notice),
@@ -173,17 +174,19 @@ def _render_listings(session: dict) -> None:
             st.rerun()
         return
     if not listings:
-        icon_title("home", "매물")
-        empty_state("home", "아직 매물이 없어요. 본 집 메모를 적으면 AI가 비교표로 정리해 드려요.",
-                    button="첫 집 메모 적기", link="#new-memo", key="p1_empty_listings")
+        _listings_header(session)
+        if empty_state("home", "아직 매물이 없어요. 본 집 메모를 적으면 AI가 비교표로 정리해 드려요.",
+                       button="첫 집 메모 적기", key="p1_empty_listings"):
+            _new_memo_dialog(session)
         return
     comparison = _session_comparison(sid)
     _render_summary(listings, comparison)
-    icon_title("home", "매물")
     photos = _session_photos(sid)
     rows = summary.rows_by_listing(comparison)
+    st.html(LISTINGS_SPACING_CSS)   # 요약 카드↔'매물' 줄, '매물' 제목 줄↔첫 매물 카드 여백
     cards, side = st.columns([3, 2])
     with cards:
+        _listings_header(session)
         for lst in listings:
             _listing_card(lst, photos.get(str(lst["id"])), rows.get(str(lst["id"])))
         if len(listings) == 1:
@@ -196,24 +199,56 @@ def _render_listings(session: dict) -> None:
         render_session_map(session, listings)
 
 
-NEW_MEMO_LABEL = "새 매물 메모 추가"     # 아이콘은 expander icon=
+NEW_MEMO_LABEL = "새 매물 메모 추가"     # 모달 창 제목
 MANAGE_LABEL = "세션 관리"
+# 여백 CSS. theme.css가 st.container()를 모두 카드(흰 배경·테두리·그림자)로 그리므로 여백용 컨테이너는 쓰지 않고,
+# [새 매물 메모] 버튼(키 클래스 st-key-p1_new_memo_open…)을 품은 stLayoutWrapper를 :has()로 골라 여백만 준다.
+#  - 제목 줄: 버튼을 품은 가장 안쪽 가로 줄 → 아래 여백(첫 매물 카드와 떨어지게)
+#  - 매물·AI 정리 줄: 제목 줄을 품은 바로 바깥 가로 줄 → 위 여백(요약 숫자 카드와 떨어지게)
+_BTN = '[class*="st-key-p1_new_memo_open"]'
+_ROW = '[data-testid="stLayoutWrapper"]'
+LISTINGS_SPACING_CSS = (
+    "<style>"
+    f"{_ROW}:has({_BTN}):not(:has({_ROW} {_BTN})) {{ margin-bottom: 1rem; }}"
+    # 제목을 버튼과 세로 가운데로: icon_title의 위·아래 여백(.5rem/.25rem)과 Markdown 상자의 음수 아래 여백(-1rem)
+    # 때문에 제목 칸 높이가 실제보다 작게 잡혀 제목이 아래로 쳐진다 → 이 줄에서만 둘 다 0
+    f"{_ROW}:has({_BTN}):not(:has({_ROW} {_BTN})) .ht-icon-title {{ margin: 0 !important; }}"
+    f"{_ROW}:has({_BTN}):not(:has({_ROW} {_BTN})) [data-testid=\"stMarkdownContainer\"]:has(> .ht-icon-title) "
+    "{ margin-bottom: 0 !important; }"
+    f"{_ROW}:has({_ROW} {_BTN}):not(:has({_ROW} {_ROW} {_BTN})) {{ margin-top: 1.5rem; }}"
+    "</style>"
+)
 
 
-def _render_new_memo(session: dict) -> None:
-    """매물 목록 바로 아래 펼침 상자. 매물이 없으면 처음부터 펼쳐 둔다."""
+def _save_new_memo(sid: str, text: str) -> str:
+    created = api_post(f"/sessions/{sid}/listings", json={"memo_text": text})
+    # 저장하면 모달이 닫히고 화면 전체를 다시 그린다. 안내는 화면 위쪽(show_flash)과 토스트로 보여 준다.
+    flash("session_detail", f"{created['label']}을(를) 저장했습니다. 매물을 눌러 분석을 실행하거나 다음 집 메모를 적으세요.")
+    return ""
+
+
+def _new_memo_dialog(session: dict) -> None:
+    """새 매물 메모 모달. 입력칸·초안 자동 저장·저장은 기존 메모 입력 부품(render_memo_editor) 그대로."""
     sid = session["id"]
 
-    def save(text: str) -> str:
-        created = api_post(f"/sessions/{sid}/listings", json={"memo_text": text})
-        return f"{created['label']}을(를) 저장했습니다. 매물을 눌러 분석을 실행하거나 다음 집 메모를 적으세요."
-
-    # 빈 화면 카드의 [첫 집 메모 적기 →]가 이 자리로 온다
-    st.markdown('<div id="new-memo"></div>', unsafe_allow_html=True)
-    with st.expander(NEW_MEMO_LABEL, icon=":material/edit_note:", expanded=not session.get("listing_count")):
+    @st.dialog(NEW_MEMO_LABEL, width="large")
+    def _dialog() -> None:
         render_memo_editor(scope=f"new:{sid}", draft_path=f"/sessions/{sid}/draft", initial_text="",
                            label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
-                           on_save=save, clear_after_save=True)
+                           on_save=lambda text: _save_new_memo(sid, text), clear_after_save=True)
+
+    _dialog()
+
+
+def _listings_header(session: dict) -> None:
+    """'매물' 제목과 오른쪽 [새 매물 메모] 버튼(누르면 모달). 여백은 LISTINGS_SPACING_CSS."""
+    title, action = st.columns([3, 1.3], vertical_alignment="center")
+    with title:
+        icon_title("home", "매물")
+    with action:
+        if st.button("새 매물 메모", key=f"p1_new_memo_open:{session['id']}", icon=":material/edit_note:",
+                     type="primary", width="stretch"):
+            _new_memo_dialog(session)
 
 
 def _render_session_edit(session: dict) -> None:
@@ -277,7 +312,6 @@ def render_session_section(ctx: dict) -> None:
     session = ctx["session"]
     show_flash("session_detail")
     _render_listings(session)
-    _render_new_memo(session)
 
 
 def render_session_manage(ctx: dict) -> None:

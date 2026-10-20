@@ -32,7 +32,7 @@ F12·F14는 구현했고(아래 F12·F14 절), F13은 내 매물 위치·세션 
 
 - API: `GET /score-items`, `GET·POST /weight-profiles`, `GET·PUT·DELETE /weight-profiles/{profile_id}`, `GET·PUT /listings/{listing_id}/satisfaction`, `GET·PUT /sessions/{session_id}/scoring`, `GET /sessions/{session_id}/scores?filters=`. 모델은 `features/scoring/schemas.py`. [Claude 제안]
 - 비교표 열 key `score`(제목 "적합도", order 20). 열은 필터 전 전체 매물로 계산하므로 순위는 넣지 않는다. [기존 계획 + Claude 제안]
-- 화면 슬롯: `session_detail` 25 가중치 설정·프로필 관리, 35 적합도 순위 / `listing_detail` 45 항목 만족도. [Claude 제안]
+- 화면 슬롯: `session_detail` 45 가중치 설정·프로필 관리(예산 40 아래), 35 적합도 순위 / `listing_detail` 45 항목 만족도. [Claude 제안]
 - 마이페이지 '가중치 프로필' 탭: 세션과 상관없이 프로필 목록을 보고 만들기·고치기·삭제(`render_profile_manager()`, 마이페이지 P4 파일에서 부름). [요청]
 - 테이블(`0120_scoring.sql`, 소유 사슬 RLS) [기존 계획을 바꿈]
 
