@@ -71,6 +71,12 @@ def _app(body: str):
     return at
 
 
+def _detail(post_id: str, scope: str = "list"):
+    """상세 페이지(balpum_post): [자세히 보기]로 고른 후기를 연 상태."""
+    return _app(f'st.session_state.setdefault("balpum_post", {{"id": {post_id!r}, "scope": {scope!r}}})\n'
+                "pages.render_post()")
+
+
 def _button(at, label):
     return next(b for b in at.button if b.label == label)
 
@@ -123,13 +129,39 @@ def test_community_list_empty_message(ui_fake):
     assert [b.label for b in at.button].count("발품 후기 쓰기") == 2                    # 위쪽 + 빈 카드의 다음 행동
 
 
-def test_community_detail_edit_only_for_mine(ui_fake):
+def test_community_open_goes_to_detail_page(ui_fake):
+    """[자세히 보기]는 상세 페이지로 이동한다(목록 페이지는 늘 목록만 보인다)."""
     at = _app("pages.render_list()")
     at.button(key="balpum_open:list:p-other").click().run()
+    assert ("NAV", "balpum_post", None) in ui_fake.calls
+    assert at.session_state["balpum_post"] == {"id": "p-other", "scope": "list"}
+    assert not at.subheader and at.button(key="balpum_open:list:p-other")   # 목록 페이지에 상세를 그리지 않는다
+
+
+def test_community_list_ignores_previous_detail(ui_fake):
+    """마지막에 본 후기가 있어도 사이드바 '발품 후기'는 목록을 보여 준다."""
+    at = _app('st.session_state["balpum_post"] = {"id": "p-mine", "scope": "list"}\npages.render_list()')
+    assert not at.subheader and len([b for b in at.button if b.label == "자세히 보기 →"]) == 2
+
+
+def test_community_detail_back_goes_to_list(ui_fake):
+    at = _detail("p-other")
+    assert at.title[0].value == "발품 후기" and at.subheader[0].value == "밤에 도로 소음이 커요"
+    _button(at, "← 목록으로").click().run()
+    assert ("NAV", "balpum_list", None) in ui_fake.calls
+    assert "mypage_open_tab:balpum" not in at.session_state
+
+
+def test_community_detail_without_selection_goes_to_list(ui_fake):
+    _app("pages.render_post()")
+    assert ui_fake.calls[-1] == ("NAV", "balpum_list", None)
+
+
+def test_community_detail_edit_only_for_mine(ui_fake):
+    at = _detail("p-other")
     assert at.subheader[0].value == "밤에 도로 소음이 커요"
     assert not any(b.label in ("수정", "삭제") for b in at.button)    # 남의 글은 보기만
-    _button(at, "← 목록으로").click().run()
-    at.button(key="balpum_open:list:p-mine").click().run()
+    at = _detail("p-mine")
     assert {"수정", "삭제"} <= {b.label for b in at.button}
     _button(at, "수정").click().run()
     next(t for t in at.text_input if t.label == "제목 *").set_value("고친 제목")
@@ -141,14 +173,14 @@ def test_community_detail_edit_only_for_mine(ui_fake):
 
 
 def test_community_detail_delete_with_confirm(ui_fake):
-    at = _app("pages.render_list()")
-    at.button(key="balpum_open:list:p-mine").click().run()
+    at = _detail("p-mine")
     _button(at, "삭제").click().run()
     assert any("지울까요" in w.value for w in at.warning)
     _button(at, "지우기").click().run()
     assert not at.exception, at.exception
     assert ("DELETE", "/community/posts/p-mine", None) in ui_fake.calls
-    assert any("후기를 지웠습니다" in s.value for s in at.success)
+    assert ("NAV", "balpum_list", None) in ui_fake.calls                          # 지우면 목록으로
+    assert at.session_state["balpum_flash:list"] == "후기를 지웠습니다."
 
 
 # ------------------------------------------------------------------ 좋아요·정렬
@@ -178,8 +210,7 @@ def test_community_list_shows_like_counts_and_sort(ui_fake):
 
 
 def test_community_detail_like_toggle(ui_fake):
-    at = _app("pages.render_list()")
-    at.button(key="balpum_open:list:p-other").click().run()
+    at = _detail("p-other")
     like = at.button(key="balpum_like:list:p-other")
     assert like.label == "♡ 좋아요 0"
     like.click().run()
@@ -195,8 +226,7 @@ def test_community_detail_like_toggle(ui_fake):
 
 
 def test_community_detail_own_post_has_no_like_button(ui_fake):
-    at = _app("pages.render_list()")
-    at.button(key="balpum_open:list:p-mine").click().run()
+    at = _detail("p-mine")
     assert not any(b.key and b.key.startswith("balpum_like:") for b in at.button)
     assert any("내 글에는 누를 수 없어요" in c.value for c in at.caption)
 
@@ -244,10 +274,41 @@ def test_community_mypage_tab_lists_my_posts(ui_fake):
     at = _app("mypage_tab.render_my_posts()")
     assert ("GET", "/community/posts", {"mine": "true", "limit": 200}) in ui_fake.calls
     assert "보일러가 욕실 안쪽에 있어요" in "\n".join(str(m.value) for m in at.markdown)
+    assert not at.subheader                                          # 탭 이름과 겹치는 제목은 없다
+
+
+def test_community_mypage_tab_ignores_previous_detail(ui_fake):
+    """마지막에 본 후기가 있어도 '내 발품 후기' 탭은 목록을 보여 준다."""
+    ui_fake.responses["/community/posts"] = [MINE]
+    at = _app('st.session_state["balpum_post"] = {"id": "p-mine", "scope": "mypage"}\n'
+              "mypage_tab.render_my_posts()")
+    assert not any(b.label == "← 목록으로" for b in at.button)
+    at.button(key="balpum_open:mypage:p-mine").click().run()
+    assert ui_fake.calls[-1] == ("NAV", "balpum_post", None)
+    assert at.session_state["mypage_open_tab:balpum"] is True       # 돌아오면 '내 발품 후기' 탭
+
+
+def test_community_mypage_detail_keeps_mypage_title_and_tabs(ui_fake, monkeypatch):
+    """마이페이지에서 연 상세: 마이페이지 제목·탭은 그대로, '내 발품 후기' 탭에 상세."""
+    from features.mypage import pages as mypage
+
+    for name in ("_my_photos", "_summary", "render_profile_manager"):   # 다른 탭은 이 테스트와 상관없다
+        monkeypatch.setattr(mypage, name, lambda: None)
+    at = _app('st.session_state.setdefault("balpum_post", {"id": "p-mine", "scope": "mypage"})\n'
+              "pages.render_post()")
+    assert at.title[0].value == "마이페이지"
+    assert [t.label for t in at.tabs] == ["내 정보", "내 사진", "요약", "가중치 프로필", "내 발품 후기"]
+    balpum = at.tabs[4]
+    assert [h.value for h in balpum.subheader] == ["보일러가 욕실 안쪽에 있어요"]   # 탭 안에 '내 발품 후기' 제목은 없다
+    assert {"← 목록으로", "수정", "삭제"} <= {b.label for b in balpum.button}
+    _button(at, "← 목록으로").click().run()
+    assert ("NAV", "mypage", None) in ui_fake.calls
+    assert at.session_state["mypage_open_tab:balpum"] is True
 
 
 def test_community_pages_registered():
     from features.community.pages import PAGES
 
     assert [(p["key"], p["title"], p["order"], p.get("hidden", False)) for p in PAGES] == [
-        ("balpum_write", "발품 후기 쓰기", 60, True), ("balpum_list", "발품 후기", 65, False)]
+        ("balpum_write", "발품 후기 쓰기", 60, True), ("balpum_list", "발품 후기", 65, False),
+        ("balpum_post", "발품 후기 상세", 66, True)]

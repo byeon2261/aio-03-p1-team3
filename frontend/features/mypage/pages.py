@@ -9,6 +9,7 @@ from core.api import ApiError, api_get, api_patch, api_post
 from core.ui import fmt_kst, show_api_error
 from features.photos.components import photo_grid, show_flash
 from features.scoring.sections import render_profile_manager   # F12 가중치 프로필 탭
+from features.community.components import MYPAGE_TAB_FLAG   # F14 상세에서 돌아올 때 열 탭
 from features.community.mypage_tab import render_my_posts   # F14 내 발품 후기 탭
 
 NICKNAME_MAX = 20
@@ -151,13 +152,17 @@ def _summary() -> None:
             nav.go_session_detail(sess["id"])
 
 
-def render_mypage() -> None:
+def render_mypage(balpum_post_id: str | None = None) -> None:
+    """balpum_post_id: 발품 후기 상세 페이지(balpum_post)가 부를 때 '내 발품 후기' 탭에 보일 후기."""
     st.title("마이페이지")
     nick_msg = st.session_state.pop("mypage_flash:nickname", None)
     if nick_msg:
         st.success(nick_msg)
+    # 발품 후기 상세를 보거나, 상세에서 돌아오면('← 목록으로'·브라우저 뒤로가기) '내 발품 후기' 탭을 연다
+    back_from_post = bool(balpum_post_id) or st.session_state.pop(MYPAGE_TAB_FLAG, False)
     tab_info, tab_photos, tab_summary, tab_weights, tab_balpum = st.tabs(
-        ["내 정보", "내 사진", "요약", "가중치 프로필", "내 발품 후기"])
+        ["내 정보", "내 사진", "요약", "가중치 프로필", "내 발품 후기"],
+        default="내 발품 후기" if back_from_post else None)
     with tab_info:
         _nickname_form()
         st.divider()
@@ -169,7 +174,7 @@ def render_mypage() -> None:
     with tab_weights:
         render_profile_manager()
     with tab_balpum:
-        render_my_posts()
+        render_my_posts(balpum_post_id)
 
 
 PAGES = [{"key": "mypage", "title": "마이페이지", "order": 80, "admin_only": False, "render": render_mypage}]
