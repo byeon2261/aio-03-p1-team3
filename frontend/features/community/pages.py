@@ -1,7 +1,10 @@
-"""F14 발품 후기 페이지 2개: 쓰기(key balpum_write, order 60) · 목록(key balpum_list, order 65).
+"""F14 발품 후기 페이지 3개: 쓰기(key balpum_write, order 60) · 목록(key balpum_list, order 65)
+· 상세(key balpum_post, order 66).
 
 사이드바에는 목록('발품 후기')만 보인다. 쓰기는 목록의 [발품 후기 쓰기] 버튼으로 가고,
-등록을 마치면 목록으로 돌아간다.
+등록을 마치면 목록으로 돌아간다. 상세는 목록·마이페이지 '내 발품 후기' 탭의 [자세히 보기]로 가고
+(마이페이지에서 열면 마이페이지 제목·탭 아래 '내 발품 후기' 탭에 보인다),
+'← 목록으로'나 브라우저 뒤로가기로 연 곳의 목록에 돌아간다. 사이드바 '발품 후기'는 늘 목록을 연다.
 """
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ from core import nav
 from core.api import ApiError, api_get, api_post
 from features.community.address_picker import open_search_dialog
 from features.community.components import (
-    opened_post, render_post_detail, render_post_list, set_flash, show_error, show_flash, upload_photo,
+    back_to_list, opened_post, render_post_detail, render_post_list, set_flash, show_error, show_flash, upload_photo,
 )
 from features.community.view import (
     ADDRESS_MAX, ALL, BODY_MAX, DEFAULT_SORT, FLOOR_OPTIONS, PHOTO_EXTS, PRIVACY_NOTICE, TITLE_MAX, TOPICS,
@@ -126,10 +129,6 @@ def render_list() -> None:
     c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
     c1.title("발품 후기")
     show_flash(LIST_SCOPE)
-    open_id = opened_post(LIST_SCOPE)
-    if open_id:
-        render_post_detail(open_id, LIST_SCOPE)
-        return
     if c2.button("발품 후기 쓰기", type="primary", key="balpum_list_go_write", width="stretch"):
         nav.go_page("balpum_write")
     st.caption("집 보러 가기 전, 같은 주소·층의 후기로 확인할 것을 준비하세요.")
@@ -150,8 +149,27 @@ def render_list() -> None:
     render_post_list(posts, LIST_SCOPE, empty, sort_key=SORT_KEY, on_write=lambda: nav.go_page("balpum_write"))
 
 
+# ------------------------------------------------------------------ 상세
+def render_post() -> None:
+    opened = opened_post()
+    if opened is None:        # 고른 후기가 없으면(새로 고침 등) 목록으로
+        back_to_list(LIST_SCOPE)
+        return
+    scope = opened.get("scope") or LIST_SCOPE
+    if scope == "mypage":     # 마이페이지 제목·탭은 그대로 두고 '내 발품 후기' 탭에 상세를 보인다
+        from features.mypage.pages import render_mypage   # mypage가 community를 import하므로 여기서
+
+        render_mypage(balpum_post_id=opened["id"])
+        return
+    st.title("발품 후기")
+    show_flash(scope)
+    render_post_detail(opened["id"], scope)
+
+
 PAGES = [
     {"key": "balpum_write", "title": "발품 후기 쓰기", "order": 60, "admin_only": False, "hidden": True,
      "render": render_write},
     {"key": "balpum_list", "title": "발품 후기", "order": 65, "admin_only": False, "render": render_list},
+    {"key": "balpum_post", "title": "발품 후기 상세", "order": 66, "admin_only": False, "hidden": True,
+     "render": render_post},
 ]

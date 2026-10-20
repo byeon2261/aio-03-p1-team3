@@ -1,5 +1,8 @@
 """발품 후기 화면 부품: 후기 카드, 상세(내 글이면 수정·삭제·사진 바꾸기).
 목록 페이지와 마이페이지 '내 발품 후기' 탭이 함께 쓴다. import 시 st 함수를 부르지 않는다.
+
+상세는 숨김 페이지 balpum_post(features/community/pages.py)에서 보인다. 카드의 [자세히 보기]가
+그 페이지로 이동하므로 브라우저 뒤로가기·'← 목록으로'·사이드바 '발품 후기'는 모두 목록을 보여 준다.
 """
 
 from __future__ import annotations
@@ -8,6 +11,7 @@ import datetime as dt
 
 import streamlit as st
 
+from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post, api_put
 from core.ui import empty_state, fmt_kst, notify, show_api_error
 from features.community.view import (
@@ -16,8 +20,11 @@ from features.community.view import (
     fmt_floor_option, like_button_label, like_mark, meta_line,
 )
 
-OPEN_KEY = "balpum_open:{scope}"        # 상세로 연 후기 id
+OPEN_KEY = "balpum_post"                # 상세 페이지에서 볼 후기 {"id", "scope"}
 FLASH_KEY = "balpum_flash:{scope}"
+# 상세에서 돌아갈 목록 페이지(scope → 페이지 key). 마이페이지는 '내 발품 후기' 탭을 열어 둔다
+BACK_PAGES = {"list": "balpum_list", "mypage": "mypage"}
+MYPAGE_TAB_FLAG = "mypage_open_tab:balpum"
 
 
 def set_flash(scope: str, message: str) -> None:
@@ -55,16 +62,26 @@ def upload_photo(post_id: str, file) -> bool:
         return False
 
 
-def open_post(scope: str, post_id: str | None) -> None:
-    key = OPEN_KEY.format(scope=scope)
-    if post_id is None:
-        st.session_state.pop(key, None)
-    else:
-        st.session_state[key] = post_id
+def open_post(scope: str, post_id: str) -> None:
+    """후기 상세 페이지로 이동한다(목록과 다른 주소라 브라우저 뒤로가기가 목록으로 돌아온다)."""
+    st.session_state[OPEN_KEY] = {"id": post_id, "scope": scope}
+    if scope == "mypage":    # '← 목록으로'든 브라우저 뒤로가기든 마이페이지는 '내 발품 후기' 탭으로 연다
+        st.session_state[MYPAGE_TAB_FLAG] = True
+    nav.go_page("balpum_post")
 
 
-def opened_post(scope: str) -> str | None:
-    return st.session_state.get(OPEN_KEY.format(scope=scope))
+def opened_post() -> dict | None:
+    """상세 페이지에서 볼 후기 {"id", "scope"}. 고른 후기가 없으면 None."""
+    opened = st.session_state.get(OPEN_KEY)
+    return opened if isinstance(opened, dict) and opened.get("id") else None
+
+
+def back_to_list(scope: str) -> None:
+    """상세 → 그 후기를 연 목록(발품 후기 목록 또는 마이페이지 '내 발품 후기' 탭)."""
+    st.session_state.pop(OPEN_KEY, None)
+    if scope == "mypage":
+        st.session_state[MYPAGE_TAB_FLAG] = True
+    nav.go_page(BACK_PAGES.get(scope, "balpum_list"))
 
 
 # ------------------------------------------------------------------ 카드
@@ -77,7 +94,6 @@ def post_card(post: dict, scope: str) -> None:
         c1.caption(like_mark(post))
         if c2.button("자세히 보기 →", key=f"balpum_open:{scope}:{post['id']}", type="tertiary", width="stretch"):
             open_post(scope, post["id"])
-            st.rerun()
 
 
 # ------------------------------------------------------------------ 상세
@@ -148,9 +164,8 @@ def _delete_controls(post: dict, scope: str) -> None:
         except ApiError as e:
             show_error(e)
             return
-        open_post(scope, None)
         set_flash(scope, "후기를 지웠습니다.")
-        st.rerun()
+        back_to_list(scope)
     if c2.button("취소", key=f"balpum_del_no:{scope}:{pid}", width="stretch"):
         st.session_state.pop(confirm_key, None)
         st.rerun()
@@ -158,13 +173,11 @@ def _delete_controls(post: dict, scope: str) -> None:
 
 def render_post_detail(post_id: str, scope: str) -> None:
     if st.button("← 목록으로", key=f"balpum_back:{scope}"):
-        open_post(scope, None)
-        st.rerun()
+        back_to_list(scope)
     try:
         post = api_get(f"/community/posts/{post_id}")
     except ApiError as e:
         show_error(e)
-        open_post(scope, None)
         return
     with st.container(border=True):
         st.subheader(post["title"])
