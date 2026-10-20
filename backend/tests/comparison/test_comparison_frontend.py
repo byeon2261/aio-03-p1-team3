@@ -54,3 +54,42 @@ def test_comparison_title_has_help_and_includes_column(ui_fake):
     assert comparison_table.TITLE_HELP in [c.value for c in at.caption]          # 도움말은 제목 아래 회색 한 줄
     table = next(m.value for m in at.markdown if m.value.startswith("| 매물"))
     assert "포함 내역" in table.splitlines()[0] and "인터넷, 수도" in table
+
+
+SHARED_SCRIPT = f"""
+import sys
+sys.path.insert(0, {str(FRONTEND_DIR)!r})
+import _comparison_ui_fake as fake
+from features.comparison import comparison_table
+
+def _get(path, params=None, **kw):
+    fake.calls.append(params)
+    return fake.data
+
+comparison_table.api_get = _get
+comparison_table.render_comparison({{"session": {{"id": "s1", "title": "토요일"}}, "comparison": fake.data}})
+"""
+
+
+def test_reuses_comparison_from_session_section(ui_fake):
+    """매물 목록 섹션이 ctx에 넣은 비교표 응답이 있으면 같은 API를 다시 부르지 않는다."""
+    from streamlit.testing.v1 import AppTest
+
+    ui_fake.calls = []
+    at = AppTest.from_string(SHARED_SCRIPT, default_timeout=10)
+    at.run()
+    assert not at.exception, at.exception
+    assert ui_fake.calls == []
+    assert any(m.value.startswith("| 매물") for m in at.markdown)
+
+
+def test_budget_filter_still_calls_api(ui_fake):
+    """예산 필터를 켜면 필터 결과가 달라서 ctx 응답을 쓰지 않고 따로 부른다."""
+    from streamlit.testing.v1 import AppTest
+
+    ui_fake.calls = []
+    at = AppTest.from_string(SHARED_SCRIPT, default_timeout=10)
+    at.session_state[comparison_table.state.budget_filter_key("s1")] = True
+    at.run()
+    assert not at.exception, at.exception
+    assert ui_fake.calls == [{"filters": comparison_table.BUDGET_FILTER}]

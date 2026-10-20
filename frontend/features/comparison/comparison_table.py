@@ -34,9 +34,12 @@ def render_comparison(ctx: dict) -> None:
 
     filter_on = bool(st.session_state.get(state.budget_filter_key(sid)))
     params = {"filters": BUDGET_FILTER} if filter_on else None
+    # 필터가 꺼져 있으면 위 매물 목록(F2, order 10)이 이번 화면에서 이미 받은 응답을 그대로 쓴다(같은 API 두 번 방지)
+    data = None if filter_on else ctx.get("comparison")
     try:
-        with st.spinner("비교표를 불러오는 중…"):
-            data = api_get(f"/sessions/{sid}/comparison", params=params)
+        if data is None:
+            with st.spinner("비교표를 불러오는 중…"):
+                data = api_get(f"/sessions/{sid}/comparison", params=params)
     except ApiError as e:
         show_api_error(e)
         if st.button("다시 시도", key=f"cmp_retry:{sid}"):

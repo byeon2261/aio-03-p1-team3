@@ -78,7 +78,8 @@ def _thumbnail(photos: list[dict], label: str) -> None:
 def _session_comparison(session_id: str) -> dict | None:
     """요약 숫자·카드 숫자에 쓸 비교표 응답(예산 필터 없이 전체 매물). 못 불러오면 None(숫자 없이 목록만 표시).
 
-    비교표 섹션(P3)도 같은 API를 부른다. 이 화면 안의 부가 정보라 실패해도 오류 상자는 띄우지 않는다.
+    받은 응답은 ctx["comparison"]에 넣어 아래 비교표 섹션(P3)이 같은 API를 다시 부르지 않게 한다.
+    이 화면 안의 부가 정보라 실패해도 오류 상자는 띄우지 않는다.
     """
     try:
         return api_get(f"/sessions/{session_id}/comparison")
@@ -173,7 +174,7 @@ def _listing_card(lst: dict, photos: list[dict] | None = None, row: dict | None 
                 nav.go_listing_detail(lst["id"])
 
 
-def _render_listings(session: dict) -> None:
+def _render_listings(session: dict, ctx: dict | None = None) -> None:
     sid = session["id"]
     try:
         with st.spinner("매물을 불러오는 중…"):
@@ -191,6 +192,8 @@ def _render_listings(session: dict) -> None:
             _new_memo_dialog(session)
         return
     comparison = _session_comparison(sid)
+    if comparison is not None and ctx is not None:
+        ctx["comparison"] = comparison    # 비교표 섹션(order 30)이 다시 부르지 않고 쓴다
     _render_summary(listings, comparison)
     photos = _session_photos(sid)
     rows = summary.rows_by_listing(comparison)
@@ -380,7 +383,7 @@ def _render_session_delete(session: dict) -> None:
 def render_session_section(ctx: dict) -> None:
     session = ctx["session"]
     show_flash("session_detail")
-    _render_listings(session)
+    _render_listings(session, ctx)
 
 
 def render_session_manage(ctx: dict) -> None:
