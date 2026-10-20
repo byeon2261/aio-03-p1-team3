@@ -153,17 +153,18 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
    5. `supabase/migrations/0007_budget.sql`
    6. `supabase/migrations/0008_feedback_action.sql`
    7. `supabase/migrations/0009_listing_name.sql` (매물 이름, 예: "1번방")
-   8. `supabase/migrations/0120_scoring.sql` (F12 항목 가중치화)
-   9. `supabase/migrations/0131_listing_locations.sql` (F13 내 매물 위치)
-   10. `supabase/migrations/0132_drop_map_listings.sql` (F13 서울역 더미 매물 테이블 삭제, 없으면 아무 일도 안 함)
-   11. `supabase/migrations/0140_community.sql` (F14 발품 후기)
-   12. `supabase/migrations/0141_community_likes.sql` (F14 발품 후기 좋아요)
+   8. `supabase/migrations/0010_listing_name_update.sql` (매물 이름 수정 권한)
+   9. `supabase/migrations/0120_scoring.sql` (F12 항목 가중치화)
+   10. `supabase/migrations/0131_listing_locations.sql` (F13 내 매물 위치)
+   11. `supabase/migrations/0132_drop_map_listings.sql` (F13 서울역 더미 매물 테이블 삭제, 없으면 아무 일도 안 함)
+   12. `supabase/migrations/0140_community.sql` (F14 발품 후기)
+   13. `supabase/migrations/0141_community_likes.sql` (F14 발품 후기 좋아요)
 
    0004·0005는 비워 둔 번호다. 0120~은 F12, 0130~은 F13, 0140~은 F14가 쓴다.
 
    **병합 전에 실행**: Render 서버는 main에 병합되는 즉시 자동으로 새로 배포된다(`render.yaml`의 `autoDeployTrigger: commit`). 그래서 새 마이그레이션이 들어 있는 PR은 승인 뒤 **병합하기 전에** 이 단계처럼 SQL Editor에서 먼저 실행하고, 실행이 끝나면 병합한다. 새 테이블·열만 더하는 마이그레이션은 먼저 실행해도 지금 돌고 있는 서버에 영향이 없다.
 
-   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다. 마찬가지로 `0120_scoring.sql`을 실행하기 전에 새 서버가 뜨면 비교표의 적합도 열이 “불러오지 못함”으로 나오고 항목 가중치 화면이 오류를 낸다. `0140_community.sql`을 실행하기 전에 새 서버가 뜨면 발품 후기 화면이 오류를 낸다. `0131_listing_locations.sql`을 실행하기 전에 새 서버가 뜨면 전체 매물·세션 상세의 매물 지도와 매물 상세의 '위치'가 오류를 낸다. `0009_listing_name.sql`을 실행하기 전에 새 서버가 뜨면 새 매물 메모 저장이 “name 열 없음”으로 실패한다(0009는 0141 다음에 만들었지만 번호 순서상 0008 뒤에 적었다. 이미 0141까지 실행한 DB는 0009만 실행하면 된다).
+   **이미 배포한 DB를 올릴 때**: 새 마이그레이션만 번호 순서대로 실행한 **뒤에** 새 서버를 배포한다. 예를 들어 `0008_feedback_action.sql`(feedback에 `action` 열 추가)을 실행하기 전에 새 서버가 뜨면, 수정·평가 저장이 “action 열 없음”으로 실패한다. 마찬가지로 `0120_scoring.sql`을 실행하기 전에 새 서버가 뜨면 비교표의 적합도 열이 “불러오지 못함”으로 나오고 항목 가중치 화면이 오류를 낸다. `0140_community.sql`을 실행하기 전에 새 서버가 뜨면 발품 후기 화면이 오류를 낸다. `0131_listing_locations.sql`을 실행하기 전에 새 서버가 뜨면 전체 매물·세션 상세의 매물 지도와 매물 상세의 '위치'가 오류를 낸다. `0009_listing_name.sql`을 실행하기 전에 새 서버가 뜨면 새 매물 메모 저장이 “name 열 없음”으로 실패한다(0009는 0141 다음에 만들었지만 번호 순서상 0008 뒤에 적었다. 이미 0141까지 실행한 DB는 0009만 실행하면 된다). `0010_listing_name_update.sql`을 실행하기 전에 새 서버가 뜨면 세션 상세 '매물 수정' 모달에서 이름을 바꿀 때 권한 오류로 저장이 실패한다(메모만 고치는 매물 상세 메모 탭은 그대로 동작).
 3. **버킷 확인**: Storage 화면에 비공개 버킷 `listing-photos`가 있는지 본다. 없거나 실행 결과에 `bucket insert skipped` 알림이 있으면 **Storage → New bucket**에서 이름 `listing-photos`, Public bucket 끔으로 만들고 `0006_photos.sql`을 한 번 더 실행한다.
 4. **API 키 확인**: **Settings → API Keys**에서 publishable key(`sb_publishable_…`)와 secret key(`sb_secret_…`)를 복사한다. 레거시 `anon`·`service_role` 키는 쓰지 않는다. secret key는 서버(Render) 환경변수에만 넣고, 화면(Streamlit) secrets나 저장소에는 절대 넣지 않는다. 프로젝트 URL(`https://<프로젝트 ref>.supabase.co`)도 함께 적어 둔다.
 5. **이메일 확인 설정**: Authentication의 **Sign In / Providers → Email**에 있는 **Confirm email**.

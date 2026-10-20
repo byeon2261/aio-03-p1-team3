@@ -28,7 +28,7 @@
 
 | 영역 | 테이블 | 기능 | 마이그레이션 |
 |---|---|---|---|
-| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql`, `0009_listing_name.sql` |
+| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql`, `0009_listing_name.sql`, `0010_listing_name_update.sql` |
 | 사진 | `photos` | F10 매물 사진 | `0006_photos.sql` |
 | 예산 | `session_budgets` | F11 세션 예산 | `0007_budget.sql` |
 | 항목 가중치 | `weight_profiles`, `weight_items`, `listing_satisfactions`, `session_scoring` | F12 적합도 점수 | `0120_scoring.sql` |
@@ -620,10 +620,10 @@ erDiagram
 | `id` | uuid | — | NOT NULL | `gen_random_uuid()` | PK | 매물 ID |
 | `session_id` | uuid | — | NOT NULL | — | FK → `tour_sessions.id` (CASCADE), UK(`session_id`, `listing_no`) | 소속 세션 |
 | `listing_no` | integer | 1 이상 | NOT NULL | (트리거 `assign_listing_no`) | UK(`session_id`, `listing_no`) | 세션 안 번호. 화면 이름 "N번 집" |
-| `memo_text` | text | 0~5000자 [API] | NOT NULL | `''` | 사용자 UPDATE는 이 컬럼만 | 사용자가 쓴 메모 원문 |
+| `memo_text` | text | 0~5000자 [API] | NOT NULL | `''` | 사용자 UPDATE는 이 컬럼과 `name`(0010)만 | 사용자가 쓴 메모 원문 |
 | `memo_updated_at` | timestamptz | — | NOT NULL | `now()` | 트리거 `touch_memo_updated_at` | 메모가 바뀐 시각. 재분석 필요 판단에 쓴다 |
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 만든 시각(UTC) |
-| `name` | text | 1~30자 | NULL | — | CHECK `listings_name_len`(0009). 사용자 UPDATE 권한 없음 | 매물 이름(예: "1번방"). 새 메모 저장 때 필수 [API]. null(0009 이전 매물)이면 화면에 "N번 집" |
+| `name` | text | 1~30자 | NULL | — | CHECK `listings_name_len`(0009). 사용자 UPDATE 가능(0010) | 매물 이름(예: "1번방"). 새 메모 저장 때 필수 [API], 세션 상세 매물 카드의 연필 버튼(매물 수정 모달)으로 고친다. null(0009 이전 매물)이면 화면에 "N번 집" |
 
 ### 5.4 `analyses` — AI 분석 결과
 

@@ -2,7 +2,7 @@
 
 - 번호(listing_no)는 DB 트리거가 넣는다. 서버는 보내지 않고 돌아온 행의 값을 쓴다
   (동시 저장에도 겹치지 않고, 지운 번호는 다시 쓰지 않는다).
-- memo_updated_at은 메모가 바뀔 때 DB 트리거가 갱신한다(UPDATE는 memo_text만).
+- memo_updated_at은 메모가 바뀔 때 DB 트리거가 갱신한다(UPDATE는 memo_text와, 보냈을 때만 name. 이름만 바뀌면 재분석 필요가 아니다).
 - 정식 저장(POST·PATCH)이 성공하면 해당 초안과 draftmeta를 지운다(실패는 무시, KV가 없어도 저장은 동작).
 - 삭제: get_owned_listing → emit("listing.before_delete", storage 포함) → 초안 키 삭제 → 행 삭제(분석·피드백·사진 행은 CASCADE).
 """
@@ -74,9 +74,16 @@ def update_listing(listing_id: str, body: ListingUpdateIn, user: CurrentUser = D
                    db: Database = Depends(get_user_db)) -> ListingOut:
     listing = get_owned_listing(db, user, listing_id)
     text = require_text(body.memo_text, "memo_text", MEMO_REQUIRED)
-    row = listing
+    changes: dict = {}
+    if body.name is not None:   # 이름은 보냈을 때만 바꾼다(매물 상세 메모 탭은 메모만 보낸다)
+        name = require_text(body.name, "name", NAME_REQUIRED)
+        if name != (listing.get("name") or ""):
+            changes["name"] = name
     if text != (listing.get("memo_text") or ""):
-        updated = db.update("listings", {"id": str(listing["id"])}, {"memo_text": text})
+        changes["memo_text"] = text
+    row = listing
+    if changes:
+        updated = db.update("listings", {"id": str(listing["id"])}, changes)
         if updated:
             row = updated[0]
     discard_drafts([listing_draft_key(user.auth_user_id, str(listing["id"]))])

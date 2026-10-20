@@ -280,3 +280,31 @@ def test_listing_name_shown_in_other_session_screens(client_as, make_user):
     assert [r["label"] for r in c.get(f"/sessions/{s['id']}/comparison").json()["rows"]] == names
     assert [r["label"] for r in c.get(f"/sessions/{s['id']}/budget/evaluations").json()["items"]] == names
     assert sorted(r["label"] for r in c.get(f"/sessions/{s['id']}/scores").json()["rows"]) == sorted(names)
+
+
+def test_listing_patch_updates_name_and_memo(client_as, make_user, memory_db):
+    """세션 상세 '매물 수정' 모달: 이름과 메모를 함께 고친다. 이름을 빼면 그대로 둔다."""
+    c = p1_client(client_as, make_user())
+    s = create_session(c)
+    lst = create_listing(c, s["id"], "보증금 500", name="1번방")
+    r = c.patch(f"/listings/{lst['id']}", json={"name": " 역 앞 원룸 ", "memo_text": "보증금 500"})
+    assert r.status_code == 200 and r.json()["label"] == "역 앞 원룸"
+    assert r.json()["needs_reanalysis"] is False                       # 이름만 바뀌면 메모 수정 시각도 그대로
+    assert r.json()["memo_updated_at"] == lst["memo_updated_at"]
+    r = c.patch(f"/listings/{lst['id']}", json={"memo_text": "보증금 600"})   # 매물 상세 메모 탭: 이름 안 보냄
+    assert r.json()["label"] == "역 앞 원룸" and r.json()["memo_text"] == "보증금 600"
+    for name in ("", "   "):
+        r = c.patch(f"/listings/{lst['id']}", json={"name": name, "memo_text": "보증금 600"})
+        assert r.status_code == 422 and r.json()["error"]["detail"]["fields"][0]["loc"] == ["body", "name"]
+    r = c.patch(f"/listings/{lst['id']}", json={"name": "가" * 31, "memo_text": "보증금 600"})
+    assert r.status_code == 422
+    assert memory_db.select("listings", {"id": lst["id"]})[0]["name"] == "역 앞 원룸"
+
+
+def test_listing_patch_names_listing_made_before_names(client_as, make_user, memory_db):
+    """이름 없이 만든 예전 매물("N번 집")에도 이름을 붙일 수 있다."""
+    c = p1_client(client_as, make_user())
+    s = create_session(c)
+    row = memory_db.insert("listings", {"session_id": s["id"], "memo_text": "예전 메모"})[0]
+    r = c.patch(f"/listings/{row['id']}", json={"name": "1번방", "memo_text": "예전 메모"})
+    assert r.status_code == 200 and r.json()["label"] == "1번방"
