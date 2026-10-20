@@ -1,8 +1,8 @@
 """F4·F5 매물 상세 화면의 'AI 정리' (슬롯 listing_detail, order 20~23). 자리(area)는 core/host_pages.py.
 
-    actions   분석 완료일 때만 제목 오른쪽 버튼(key analysis_run_{lid}): 메모가 바뀌면 [✨ 다시 분석](primary),
-              그대로면 [✨ 다시 정리](비활성, "메모를 고치면 다시 정리할 수 있어요")
-    notice    정리 결과 안내·재분석 안내, 분석 전·실패면 가운데 빈 상태 카드(큰 [✨ AI로 정리하기], 같은 key)
+    actions   분석 완료일 때만 제목 오른쪽 버튼(key analysis_run_{lid}, 아이콘 auto_awesome): 메모가 바뀌면
+              [다시 분석](primary), 그대로면 [다시 정리](비활성, "메모를 고치면 다시 정리할 수 있어요")
+    notice    정리 결과 안내·재분석 안내, 분석 전·실패면 가운데 빈 상태 카드(큰 [AI로 정리하기], 같은 key)
     overview  분석 완료: 숫자 카드 4개(보증금·월세·관리비·월 고정비) + 교통·층·방향·관리비 포함 한 줄
     summary   '요약' 탭: 장점·단점 상자, 확인 상태 칩 한 줄, 다음 방문 때 물어볼 것(체크 목록, 저장 안 함)
 최신 분석은 한 번만 불러와 ctx에 담아 네 자리가 같이 쓴다. import 시 st 함수를 부르지 않는다.
@@ -15,7 +15,7 @@ import html
 import streamlit as st
 
 from core.api import ApiError, api_get, api_post
-from core.ui import fmt_kst, fmt_manwon, show_api_error
+from core.ui import fmt_kst, fmt_manwon, icon_title, notify, show_api_error
 from features.analysis import logic
 
 _FLASH_KEY = "analysis_flash:{lid}"
@@ -52,6 +52,7 @@ def _show_flash(lid: str) -> None:
         return
     if flash["kind"] == "success":
         st.success("정리했습니다. 아래 결과를 확인하고, 틀린 값은 고쳐 주세요.")
+        notify("AI 정리를 마쳤어요")
     else:
         show_api_error(ApiError(flash["status"], flash["code"], flash["message"], flash.get("detail")))
 
@@ -108,6 +109,7 @@ def _latest(ctx: dict) -> tuple[dict | None, ApiError | None]:
 
 # ------------------------------------------------------------------ actions: 제목 오른쪽 버튼
 RERUN_DONE_HELP = "메모를 고치면 다시 정리할 수 있어요"
+AI_ICON = ":material/auto_awesome:"
 
 
 def render_actions(ctx: dict) -> None:
@@ -119,11 +121,11 @@ def render_actions(ctx: dict) -> None:
         return
     state = logic.button_state(listing, analysis)
     if state["needs_reanalysis"]:
-        clicked = st.button("✨ 다시 분석", key=f"analysis_run_{lid}", type="primary", disabled=state["disabled"],
-                            width="stretch")
+        clicked = st.button("다시 분석", key=f"analysis_run_{lid}", type="primary", disabled=state["disabled"],
+                            icon=AI_ICON, width="stretch")
     else:
-        clicked = st.button("✨ 다시 정리", key=f"analysis_run_{lid}", disabled=True, help=RERUN_DONE_HELP,
-                            width="stretch")
+        clicked = st.button("다시 정리", key=f"analysis_run_{lid}", disabled=True, help=RERUN_DONE_HELP,
+                            icon=AI_ICON, width="stretch")
     if clicked:
         _run_analysis(lid)
 
@@ -146,7 +148,7 @@ def _empty_card(listing: dict, analysis: dict | None) -> None:
             f'<div style="color:#64636d">{html.escape(desc)}</div></div>',
             unsafe_allow_html=True,
         )
-        if st.button("✨ AI로 정리하기", key=f"analysis_run_{lid}", type="primary", width="stretch",
+        if st.button("AI로 정리하기", key=f"analysis_run_{lid}", type="primary", width="stretch", icon=AI_ICON,
                      disabled=logic.button_state(listing, analysis)["disabled"]):
             _run_analysis(lid)
 
@@ -244,6 +246,7 @@ def render_summary(ctx: dict) -> None:
     if a is None:
         return
     lid = ctx["listing"]["id"]
+    icon_title("auto_awesome", "AI 정리")
     with st.container(border=True):
         left, right = st.columns(2)
         with left:

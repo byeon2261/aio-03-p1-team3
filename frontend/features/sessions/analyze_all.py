@@ -1,6 +1,6 @@
 """세션 화면의 [AI로 정리하기] 버튼: 아직 정리되지 않은 매물만 한 번에 분석한다.
 
-버튼은 매물 목록 오른쪽 열 맨 위의 '✨ 정리 안 된 매물 N곳' 배너(render_banner) 안에 있다.
+버튼은 매물 목록 오른쪽 열 'AI 정리' 제목 아래 '정리 안 된 매물 N곳' 배너(render_banner) 안에 있다.
 정리할 매물이 없으면 배너 대신 한 줄 안내만 보여 준다. 버튼의 key·라벨·동작은 render_button 그대로.
 
 대상 = 메모가 있고 (분석 전 · 최신 분석 실패 · 메모가 바뀌어 재분석 필요)인 매물.
@@ -38,7 +38,7 @@ BANNER_CSS = """<style>
 
 
 def banner_title(count: int) -> str:
-    return f"✨ 정리 안 된 매물 {count}곳"
+    return f"정리 안 된 매물 {count}곳"
 
 
 def needs_analysis(listing: dict) -> bool:
@@ -79,7 +79,7 @@ def run_all(targets: list[dict]) -> tuple[int, int]:
 
 def render_button(listings: list[dict], session_id: str) -> None:
     targets = analysis_targets(listings)
-    clicked = st.button(BUTTON_LABEL, key=f"p1_analyze_all:{session_id}", type="primary",
+    clicked = st.button(BUTTON_LABEL, key=f"p1_analyze_all:{session_id}", type="primary", icon=":material/auto_awesome:",
                         disabled=not targets, help=BUTTON_HELP if targets else DONE_HELP, width="stretch")
     if clicked and targets:
         ok, failed = run_all(targets)

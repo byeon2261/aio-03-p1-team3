@@ -1,8 +1,16 @@
-"""화면 공통 표시 도우미."""
+"""화면 공통 표시 도우미.
+
+icon_title  섹션 제목: 연한 색 원(32px) 안의 Material 아이콘 + 글자. 모든 화면이 같이 쓴다
+icon_badge  같은 원만(HTML 문자열). 요약 카드 라벨 등
+empty_state 빈 화면: 아이콘 + 한 줄 설명 + 다음 행동 버튼 1개
+notify      저장·삭제·AI 정리 완료 같은 결과를 오른쪽 아래 토스트로
+show_api_error  오류: "무엇이 잘못됐는지" + "다음에 할 일" 두 줄, 차분한 색(theme.css)
+"""
 
 from __future__ import annotations
 
 import datetime as dt
+import html
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -39,6 +47,66 @@ ERROR_MESSAGES: dict[str, tuple[str, str]] = {
 }
 
 
+# 아이콘 원 색(바탕, 아이콘). 기본 blue. 의미 있는 곳만 green(예산 안·장점)·orange(확인 필요·단점)
+TONES: dict[str, tuple[str, str]] = {
+    "blue": ("#EAEEFC", "#3246D3"),
+    "green": ("#E7F6EC", "#15803D"),
+    "orange": ("#FFF1E0", "#C2410C"),
+    "red": ("#FDECEC", "#C93C40"),
+    "gray": ("#EEF0F4", "#55596A"),
+}
+_ICON_FONT = "font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;" \
+             "letter-spacing:normal;text-transform:none;white-space:nowrap;-webkit-font-feature-settings:'liga';" \
+             "font-feature-settings:'liga'"
+
+
+def icon_badge(icon: str, tone: str = "blue", size: int = 32) -> str:
+    """연한 색 원 안의 Material 아이콘(HTML). icon은 Material Symbols 이름(예: "home")."""
+    bg, fg = TONES.get(tone, TONES["blue"])
+    name = html.escape(icon.replace(":material/", "").strip(":"))
+    return (f'<span aria-hidden="true" style="flex:none;width:{size}px;height:{size}px;border-radius:50%;'
+            f'background:{bg};color:{fg};display:inline-flex;align-items:center;justify-content:center">'
+            f'<span style="{_ICON_FONT};font-size:{round(size * 0.56)}px">{name}</span></span>')
+
+
+def icon_title(icon: str, text: str, tone: str = "blue", *, help: str | None = None) -> None:
+    """섹션 제목. 원과 글자 사이 8px. help가 있으면 제목 아래 작은 회색 한 줄."""
+    st.markdown(
+        f'<div class="ht-icon-title" style="display:flex;align-items:center;gap:8px;margin:.5rem 0 .25rem">'
+        f'{icon_badge(icon, tone)}<span style="font-size:1.3rem;font-weight:800;color:#110D3C;'
+        f'letter-spacing:-.01em">{html.escape(text)}</span></div>',
+        unsafe_allow_html=True,
+    )
+    if help:
+        st.caption(help)
+
+
+def empty_state(icon: str, text: str, *, button: str | None = None, key: str | None = None,
+                link: str | None = None, tone: str = "blue") -> bool:
+    """빈 화면 카드: 아이콘 + 한 줄 설명 + 다음 행동 1개(버튼, 또는 같은 화면 안 위치로 가는 링크).
+
+    버튼을 누르면 True를 돌려준다(무엇을 할지는 부르는 쪽이 정한다).
+    """
+    with st.container(border=True, key=f"ht_empty_{key or abs(hash(text))}"):
+        st.markdown(
+            f'<div style="display:flex;flex-direction:column;align-items:center;gap:.6rem;padding:.75rem 0;'
+            f'text-align:center">{icon_badge(icon, tone, 44)}<div style="color:#3d4152">{html.escape(text)}</div>'
+            + (f'<a href="{html.escape(link, quote=True)}" target="_self" style="margin-top:.25rem;font-weight:700;'
+               f'color:#3246D3;text-decoration:none">{html.escape(button or "")} →</a>' if link else "")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+        if button and not link:
+            _, mid, _ = st.columns([1, 1, 1])
+            return mid.button(button, key=key, type="primary", width="stretch")
+    return False
+
+
+def notify(message: str, icon: str = ":material/check_circle:") -> None:
+    """결과를 화면 오른쪽 아래 짧은 토스트로(기존 안내 문구는 그대로 두고 더한다)."""
+    st.toast(message, icon=icon)
+
+
 def fmt_manwon(v: int | float | None) -> str:
     """None → '미기재', 500 → '500만원'. 0은 '0만원'(미기재와 다르다)."""
     if v is None:
@@ -67,12 +135,13 @@ def show_api_error(e: Exception) -> None:
     code = getattr(e, "code", "INTERNAL_ERROR")
     message, next_step = ERROR_MESSAGES.get(code, (getattr(e, "message", None) or "요청을 처리하지 못했습니다.",
                                                    "잠시 후 다시 시도하세요."))
+    # 한 줄: 무엇이 잘못됐는지 / 다음 줄: 다음에 할 일. 색은 theme.css가 차분하게 바꾼다
     if code in ("NETWORK_ERROR", "TIMEOUT"):
-        st.warning(f"{message} {next_step}", icon="📡")
+        st.warning(f"{message}  \n{next_step}", icon=":material/wifi_off:")
     elif code == "VALIDATION_ERROR" and getattr(e, "message", None):
-        st.error(f"{e.message} {next_step}")
+        st.error(f"{e.message}  \n{next_step}", icon=":material/error:")
     else:
-        st.error(f"{message} {next_step}")
+        st.error(f"{message}  \n{next_step}", icon=":material/error:")
     rid = (getattr(e, "detail", None) or {}).get("request_id")
     if rid:
         st.caption(f"문의 시 요청 번호: {rid}")

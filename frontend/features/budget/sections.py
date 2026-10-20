@@ -15,7 +15,7 @@ import streamlit as st
 from core import nav
 from core.api import ApiError, api_get, api_put
 from core.state import budget_filter_key
-from core.ui import fmt_kst, show_api_error
+from core.ui import fmt_kst, icon_title, notify, show_api_error
 from features.budget.view import (
     budget_body, budget_summary, has_budget, hidden_summary, unknown_items, unknown_line,
 )
@@ -123,10 +123,11 @@ def render_budget(ctx: dict) -> None:
     if not sid:
         return
     with st.container(border=True):
-        st.subheader("💰 예산")
+        icon_title("account_balance_wallet", "예산")
         flash = st.session_state.pop(_flash_key(sid), None)
         if flash:
             st.success(flash)
+            notify(flash)
         budget = _load(sid)
         if budget is None:
             st.session_state[budget_filter_key(sid)] = False

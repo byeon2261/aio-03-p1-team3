@@ -13,7 +13,7 @@ import streamlit as st
 
 from core import nav
 from core.api import ApiError, api_delete, api_get, api_put
-from core.ui import show_api_error
+from core.ui import icon_badge, icon_title, show_api_error
 from features.map import components, logic
 
 PRIVACY_NOTE = "주소는 메모와 따로 저장되고 나만 볼 수 있습니다. AI 분석에는 보내지 않습니다."
@@ -69,7 +69,7 @@ def _show_saved(location: dict) -> None:
 def render_listing_location(ctx: dict) -> None:
     listing = ctx["listing"]
     lid = listing["id"]
-    st.subheader("위치")
+    icon_title("location_on", "위치")
     st.caption(PRIVACY_NOTE)
     try:
         location = api_get(f"/listings/{lid}/location").get("location")
@@ -92,7 +92,11 @@ def render_listing_location(ctx: dict) -> None:
                    "latitude": location["latitude"], "longitude": location["longitude"], "link": False}
             components.pins_map(api_key, [pin], key=f"map_loc_saved:{lid}", height=280)
     else:
-        st.caption("아직 위치가 없습니다. 주소를 검색해 저장하면 세션 화면의 매물 지도에 표시됩니다.")
+        st.markdown(
+            '<div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0">'
+            f'{icon_badge("location_on", "blue", 44)}<div style="color:#3d4152">'
+            '아직 위치가 없습니다. 주소를 검색해 저장하면 세션 화면의 매물 지도에 표시됩니다.</div></div>',
+            unsafe_allow_html=True)
 
     if not api_key:
         st.caption(NO_KEY_NOTE)

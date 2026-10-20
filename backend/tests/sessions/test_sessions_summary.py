@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import types
 from pathlib import Path
@@ -40,7 +41,7 @@ COMPARISON = {"session_id": SID, "enough_listings": True,
               "rows": [_row(1, V1, "within"), _row(2, V2, "unknown"), _row(3, {}, None), _row(4, {}, None)]}
 
 
-B, Y, C, M = "🏠 본 집", "✅ 예산 안", "⚠️ 확인 필요", "💸 최저 월 고정비"   # 요약 카드 라벨
+B, Y, C, M = "본 집", "예산 안", "확인 필요", "최저 월 고정비"   # 요약 카드 라벨(아이콘은 원 안 Material 아이콘)
 
 
 def _metrics(listings, comparison) -> dict[str, str]:
@@ -141,13 +142,25 @@ def _app():
     return at
 
 
+def _cards(at) -> dict[str, str]:
+    """요약 카드(HTML) → {라벨: 값}. 아이콘 원 다음 라벨, 큰 숫자 순서."""
+    import html as _h
+    out = {}
+    for m in at.markdown:
+        v = str(m.value)
+        if "ht-summary-card" in v:
+            texts = [_h.unescape(t) for t in re.findall(r">([^<>]+)<", v) if t.strip()]
+            out[texts[-2]] = texts[-1]          # [아이콘 이름, 라벨, 값]
+    return out
+
+
 def _md(at) -> str:
     return "\n".join(str(m.value) for m in at.markdown)
 
 
 def test_session_listings_summary_cards_and_chips(fake):
     at = _app()
-    assert {m.label: m.value for m in at.metric} == {B: "4곳", Y: "1곳", C: "5건",
+    assert _cards(at) == {B: "4곳", Y: "1곳", C: "5건",
                                                       M: "52만원"}
     md = _md(at)
     assert ">1번 집</div>" in md and ">4번 집</div>" in md
@@ -155,7 +168,9 @@ def test_session_listings_summary_cards_and_chips(fake):
     assert "월 52만원" in md and "월 38만원+?" in md
     assert ">역 도보 8분 · 3층 · 남향</div>" in md                          # 한 줄 정보
     assert md.count("금액 정리 전</div>") == 2                               # 분석 실패·분석 전 카드는 회색 한 줄
-    assert [s.value for s in at.subheader] == ["🏠 매물", "📍 지도"]
+    titles = [str(m.value) for m in at.markdown if "ht-icon-title" in str(m.value)]
+    assert [t for t in ("매물", "AI 정리", "지도") if any(f">{t}</span>" in v for v in titles)] == ["매물", "AI 정리", "지도"]
+    assert all(">home<" in v or ">auto_awesome<" in v or ">location_on<" in v for v in titles)   # 원 안 Material 아이콘
     assert fake.calls.count(f"/sessions/{SID}/comparison") == 1
     assert not at.error
 
@@ -167,7 +182,7 @@ def test_buttons_keep_keys_and_banner_runs_existing_action(fake):
     opens = [b for b in at.button if b.key.startswith("p1_open_listing:")]
     assert {b.label for b in opens} == {"상세 보기 →"}
     assert f"p1_analyze_all:{SID}" in keys
-    assert any("✨ 정리 안 된 매물 2곳" in str(m.value) for m in at.markdown)
+    assert any("정리 안 된 매물 2곳" in str(m.value) for m in at.markdown)
     assert at.button(key=f"p1_analyze_all:{SID}").label == "AI로 정리하기"
     at.button(key=f"p1_analyze_all:{SID}").click().run()
     assert fake.posts == ["/listings/l-3/analyses", "/listings/l-4/analyses"]   # 정리 안 된 매물만
@@ -184,8 +199,8 @@ def test_all_done_shows_caption_instead_of_banner(fake):
 def test_comparison_failure_keeps_cards_without_numbers(fake):
     fake.errors.add(f"/sessions/{SID}/comparison")
     at = _app()
-    assert {m.label: m.value for m in at.metric}[B] == "4곳"
-    assert {m.label: m.value for m in at.metric}[M] == "—"
+    assert _cards(at)[B] == "4곳"
+    assert _cards(at)[M] == "—"
     md = _md(at)
     assert ">1번 집</div>" in md and "월 52만원" not in md
     assert any("요약 숫자를 불러오지 못했습니다" in c.value for c in at.caption)
@@ -195,8 +210,8 @@ def test_comparison_failure_keeps_cards_without_numbers(fake):
 def test_no_listings_keeps_empty_message(fake):
     fake.responses[f"/sessions/{SID}/listings"] = []
     at = _app()
-    assert not at.metric
-    assert any("아직 매물이 없습니다" in i.value for i in at.info)
+    assert not _cards(at)
+    assert any("아직 매물이 없어요" in str(m.value) and "#new-memo" in str(m.value) for m in at.markdown)  # 빈 화면 카드
     assert f"/sessions/{SID}/comparison" not in fake.calls
 
 
@@ -242,7 +257,7 @@ def test_session_sections_order_and_expanders(fake):
     assert orders == [10, 90]                                   # 세션 관리는 맨 아래(비교표 30·순위 35 뒤)
     at = _layout_app(fake, count=4)
     labels = [e.label for e in at.expander]
-    assert labels == ["➕ 새 매물 메모 추가", "⚙️ 세션 관리"]
+    assert labels == ["새 매물 메모 추가", "세션 관리"]
     assert [e.proto.expanded for e in at.expander] == [False, False]       # 매물이 있으면 둘 다 접힘
     assert "세션 제목·방문일 수정" not in labels                # 안쪽 펼침 상자 없이 세션 관리에 묶음
     assert f"p1_delete_session:{SID}" in {b.key for b in at.button}
@@ -251,14 +266,14 @@ def test_session_sections_order_and_expanders(fake):
 def test_new_memo_expander_open_when_no_listings(fake):
     fake.responses[f"/sessions/{SID}/listings"] = []
     at = _layout_app(fake, count=0)
-    assert any("'➕ 새 매물 메모 추가'에 첫 집 메모를" in i.value for i in at.info)
-    assert at.expander[0].label == "➕ 새 매물 메모 추가" and at.expander[0].proto.expanded   # 매물 0개면 펼침
+    assert any("첫 집 메모 적기" in str(m.value) for m in at.markdown)
+    assert at.expander[0].label == "새 매물 메모 추가" and at.expander[0].proto.expanded   # 매물 0개면 펼침
 
 
 def test_session_manage_stays_open_while_confirming_delete(fake):
     at = _layout_app(fake, count=4)
     at.button(key=f"p1_delete_session:{SID}").click().run()
-    manage = next(e for e in at.expander if e.label == "⚙️ 세션 관리")
+    manage = next(e for e in at.expander if e.label == "세션 관리")
     assert manage.proto.expanded
     assert any("되돌릴 수 없습니다" in w.value for w in at.warning)
     assert {f"p1_delete_session_ok:{SID}", f"p1_delete_session_cancel:{SID}"} <= {b.key for b in at.button}

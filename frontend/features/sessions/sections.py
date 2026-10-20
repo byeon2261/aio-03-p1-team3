@@ -1,9 +1,9 @@
 """F2·F3 상세 화면 섹션.
 
 - session_detail (order 10): 맨 위 요약 숫자 카드(본 집·예산 안·확인 필요·최저 월 고정비), 매물 카드 목록
-  (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[상세 보기 →]), 오른쪽 열에 '✨ 정리 안 된 매물 N곳' 배너
-  ([AI로 정리하기])와 F13 매물 지도, 그 아래 '➕ 새 매물 메모 추가' 펼침 상자(매물이 없으면 펼친 상태).
-- session_detail (order 90): 페이지 맨 아래 '⚙️ 세션 관리' 펼침 상자(세션 제목·방문일 수정, 세션 삭제).
+  (사진 | 제목·한 줄 정보·상태 칩 | 월 고정비·[상세 보기 →]), 오른쪽 열에 'AI 정리' 제목 + '정리 안 된 매물 N곳' 배너
+  ([AI로 정리하기])와 F13 매물 지도, 그 아래 '새 매물 메모 추가' 펼침 상자(매물이 없으면 펼친 상태).
+- session_detail (order 90): 페이지 맨 아래 '세션 관리' 펼침 상자(아이콘 settings)(세션 제목·방문일 수정, 세션 삭제).
   요약 숫자·카드 숫자·예산 칩은 같은 화면의 비교표가 쓰는 GET /sessions/{id}/comparison 응답에서 만든다(summary.py).
 - listing_detail (order 10): [⋯] 팝오버 안 [매물 삭제] → 같은 팝오버 안 삭제 확인(menu), 한 번짜리 안내(notice),
   '메모' 탭의 메모 편집·저장(memo)
@@ -18,7 +18,7 @@ import streamlit as st
 
 from core import nav
 from core.api import ApiError, api_delete, api_get, api_patch, api_post
-from core.ui import fmt_kst, show_api_error
+from core.ui import empty_state, fmt_kst, icon_badge, icon_title, show_api_error
 from features.sessions import analyze_all, summary
 from features.sessions.common import flash, parse_date, show_flash, status_next_step
 from features.sessions.memo_editor import render_memo_editor
@@ -82,10 +82,20 @@ def _session_comparison(session_id: str) -> dict | None:
     return None
 
 
+def _summary_card(m: dict) -> str:
+    """요약 카드 한 장(HTML): 연한 색 원 아이콘 + 라벨, 큰 숫자. 설명은 마우스를 올리면(title)."""
+    return (f'<div class="ht-summary-card" title="{html.escape(m["help"], quote=True)}" style="background:#fff;'
+            'border:1px solid #E3E8F2;border-radius:16px;padding:1rem 1.25rem;box-shadow:0 1px 2px rgba(17,13,60,.04),'
+            '0 4px 16px rgba(17,13,60,.06)"><div style="display:flex;align-items:center;gap:8px;color:#64636d;'
+            f'font-size:14px;font-weight:600">{icon_badge(m["icon"], m["tone"], 28)}{html.escape(m["label"])}</div>'
+            f'<div style="font-size:2rem;font-weight:800;color:#110D3C;letter-spacing:-.02em;margin-top:.4rem">'
+            f'{html.escape(m["value"])}</div></div>')
+
+
 def _render_summary(listings: list[dict], comparison: dict | None) -> None:
     cols = st.columns(4)
     for col, m in zip(cols, summary.summary_metrics(listings, comparison)):
-        col.metric(m["label"], m["value"], help=m["help"])
+        col.markdown(_summary_card(m), unsafe_allow_html=True)
     if comparison is None:
         st.caption("요약 숫자를 불러오지 못했습니다. 아래 매물 비교표에서 확인하거나 새로 고쳐 주세요.")
 
@@ -157,18 +167,19 @@ def _render_listings(session: dict) -> None:
         with st.spinner("매물을 불러오는 중…"):
             listings = api_get(f"/sessions/{sid}/listings")
     except ApiError as e:
-        st.subheader("🏠 매물")
+        icon_title("home", "매물")
         show_api_error(e)
         if st.button("다시 시도", key=f"p1_listings_retry:{sid}"):
             st.rerun()
         return
     if not listings:
-        st.subheader("🏠 매물")
-        st.info("아직 매물이 없습니다. 아래 '➕ 새 매물 메모 추가'에 첫 집 메모를 적고 저장하세요.")
+        icon_title("home", "매물")
+        empty_state("home", "아직 매물이 없어요. 본 집 메모를 적으면 AI가 비교표로 정리해 드려요.",
+                    button="첫 집 메모 적기", link="#new-memo", key="p1_empty_listings")
         return
     comparison = _session_comparison(sid)
     _render_summary(listings, comparison)
-    st.subheader("🏠 매물")
+    icon_title("home", "매물")
     photos = _session_photos(sid)
     rows = summary.rows_by_listing(comparison)
     cards, side = st.columns([3, 2])
@@ -178,14 +189,15 @@ def _render_listings(session: dict) -> None:
         if len(listings) == 1:
             st.caption("매물을 하나 더 추가하면 비교할 수 있습니다.")
     with side:
+        icon_title("auto_awesome", "AI 정리")
         analyze_all.render_banner(listings, sid)
-        st.subheader("📍 지도")
+        icon_title("location_on", "지도")
         # F13: 위치를 넣은 매물을 지도에 찍는다(features/map/listing_map.py)
         render_session_map(session, listings)
 
 
-NEW_MEMO_LABEL = "➕ 새 매물 메모 추가"
-MANAGE_LABEL = "⚙️ 세션 관리"
+NEW_MEMO_LABEL = "새 매물 메모 추가"     # 아이콘은 expander icon=
+MANAGE_LABEL = "세션 관리"
 
 
 def _render_new_memo(session: dict) -> None:
@@ -196,7 +208,9 @@ def _render_new_memo(session: dict) -> None:
         created = api_post(f"/sessions/{sid}/listings", json={"memo_text": text})
         return f"{created['label']}을(를) 저장했습니다. 매물을 눌러 분석을 실행하거나 다음 집 메모를 적으세요."
 
-    with st.expander(NEW_MEMO_LABEL, expanded=not session.get("listing_count")):
+    # 빈 화면 카드의 [첫 집 메모 적기 →]가 이 자리로 온다
+    st.markdown('<div id="new-memo"></div>', unsafe_allow_html=True)
+    with st.expander(NEW_MEMO_LABEL, icon=":material/edit_note:", expanded=not session.get("listing_count")):
         render_memo_editor(scope=f"new:{sid}", draft_path=f"/sessions/{sid}/draft", initial_text="",
                            label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
                            on_save=save, clear_after_save=True)
@@ -273,7 +287,7 @@ def render_session_manage(ctx: dict) -> None:
     """
     session = ctx["session"]
     confirming = bool(st.session_state.get(_confirm_key("session", session["id"])))
-    with st.expander(MANAGE_LABEL, expanded=confirming):
+    with st.expander(MANAGE_LABEL, icon=":material/settings:", expanded=confirming):
         _render_session_edit(session)
         st.divider()
         _render_session_delete(session)

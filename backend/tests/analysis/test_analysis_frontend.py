@@ -147,14 +147,14 @@ def test_analysis_frontend_sections_have_areas():
 def test_analysis_frontend_empty_state_and_run(ui_fake):
     at = _run()
     assert "아직 정리 전이에요" in _texts(at) and "내 메모" not in _texts(at)   # 메모 미리보기 없음
-    assert [(b.label, b.key) for b in at.button] == [("✨ AI로 정리하기", f"analysis_run_{LID}")]   # 카드 안 버튼만
+    assert [(b.label, b.key) for b in at.button] == [("AI로 정리하기", f"analysis_run_{LID}")]   # 카드 안 버튼만
     ui_fake.after_post = _analysis()
     at.button[0].click().run()
     texts = _texts(at)
     assert ("POST", f"/listings/{LID}/analyses") in ui_fake.calls
     assert "정리했습니다" in texts and "보증금=500만원" in texts and "월세 ✎=50만원" in texts
     assert "월 고정비=57만원" in texts                                           # 비교표 응답의 월 고정비
-    assert [b.label for b in at.button] == ["✨ 다시 정리"] and at.button[0].disabled
+    assert [b.label for b in at.button] == ["다시 정리"] and at.button[0].disabled
 
 
 def test_analysis_frontend_memo_empty_disables_button(ui_fake):
@@ -175,7 +175,7 @@ def test_analysis_frontend_result_summary(ui_fake):
     assert "2번 집" not in t                                                  # 카드 안 중복 제목 없음
     assert len(at.checkbox) == 7 and any(e.label == "+3개 더 보기" for e in at.expander)   # 4개 + 더 보기
     assert at.warning == []
-    assert [b.label for b in at.button] == ["✨ 다시 정리"] and at.button[0].disabled   # 메모 그대로면 비활성
+    assert [b.label for b in at.button] == ["다시 정리"] and at.button[0].disabled   # 메모 그대로면 비활성
     assert at.button[0].help == "메모를 고치면 다시 정리할 수 있어요"
 
 
@@ -198,7 +198,7 @@ def test_analysis_frontend_failed_shows_card(ui_fake):
     at = _run()
     t = _texts(at)
     assert "정리하지 못했어요" in t and "형식이 맞지 않아" in t
-    assert [b.label for b in at.button] == ["✨ AI로 정리하기"] and not at.button[0].disabled
+    assert [b.label for b in at.button] == ["AI로 정리하기"] and not at.button[0].disabled
 
 
 def test_analysis_frontend_post_error_message(ui_fake):
@@ -215,7 +215,7 @@ def test_analysis_frontend_needs_reanalysis(ui_fake):
     ui_fake.latest = _analysis(needs_reanalysis=True)
     at = _run()
     assert any("메모가 바뀌었습니다" in w.value for w in at.warning)
-    assert [b.label for b in at.button] == ["✨ 다시 분석"] and not at.button[0].disabled
+    assert [b.label for b in at.button] == ["다시 분석"] and not at.button[0].disabled
 
 
 def test_analysis_frontend_network_error(ui_fake):

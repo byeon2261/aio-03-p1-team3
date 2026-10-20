@@ -147,7 +147,7 @@ def render_list() -> None:
     searched = {k: v for k, v in params.items() if k != "sort"}
     empty = ("이 조건에 맞는 후기가 아직 없어요. 처음으로 써 보세요." if searched
              else "아직 등록된 후기가 없어요. 처음으로 써 보세요.")
-    render_post_list(posts, LIST_SCOPE, empty, sort_key=SORT_KEY)
+    render_post_list(posts, LIST_SCOPE, empty, sort_key=SORT_KEY, on_write=lambda: nav.go_page("balpum_write"))
 
 
 PAGES = [

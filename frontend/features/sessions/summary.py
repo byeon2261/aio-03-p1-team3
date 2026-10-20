@@ -55,7 +55,7 @@ def _int(v: Any) -> int | None:
 
 # ------------------------------------------------------------------ 요약 숫자
 def summary_metrics(listings: list[dict], comparison: dict | None) -> list[dict]:
-    """맨 위 요약 카드 4개: [{"label", "value", "help"}].
+    """맨 위 요약 카드 4개: [{"label", "icon", "tone", "value", "help"}] (아이콘은 Material 이름, 색은 core/ui.TONES).
 
     본 집      매물 수
     예산 안    예산 판정이 '예산 안'인 매물 수. 예산을 안 정했거나 판정이 없으면(매물 1곳 등) —
@@ -68,12 +68,12 @@ def summary_metrics(listings: list[dict], comparison: dict | None) -> list[dict]
     costs = [c for c in (_int(v.get("monthly_cost_manwon")) for v in analyzed) if c is not None]
     checks = sum(len(v.get("followup_checks") or []) for v in analyzed)
     return [
-        {"label": "🏠 본 집", "value": f"{len(listings)}곳", "help": "이 세션에 저장한 매물 수입니다."},
-        {"label": "✅ 예산 안", "value": f"{judged.count('within')}곳" if judged else NO_VALUE,
+        {"label": "본 집", "icon": "home", "tone": "blue", "value": f"{len(listings)}곳", "help": "이 세션에 저장한 매물 수입니다."},
+        {"label": "예산 안", "icon": "check_circle", "tone": "green", "value": f"{judged.count('within')}곳" if judged else NO_VALUE,
          "help": "예산 판정이 '예산 안'인 매물 수입니다. 예산을 정하고 매물이 2곳 이상이면 보입니다."},
-        {"label": "⚠️ 확인 필요", "value": f"{checks}건" if analyzed else NO_VALUE,
+        {"label": "확인 필요", "icon": "error", "tone": "orange", "value": f"{checks}건" if analyzed else NO_VALUE,
          "help": "AI가 메모에서 확인하지 못했거나 애매하다고 본 항목 수의 합입니다. 집주인에게 꼭 물어보세요."},
-        {"label": "💸 최저 월 고정비", "value": fmt_manwon(min(costs)) if costs else NO_VALUE,
+        {"label": "최저 월 고정비", "icon": "savings", "tone": "blue", "value": fmt_manwon(min(costs)) if costs else NO_VALUE,
          "help": "월 고정비 = 월세 + 관리비. 관리비가 미기재인 매물은 빠집니다."},
     ]
 

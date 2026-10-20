@@ -94,7 +94,7 @@ def test_community_list_shows_all_posts_first(ui_fake):
     assert ui_fake.calls[0] == ("GET", "/community/posts", {})          # 처음엔 전체
     md = "\n".join(str(m.value) for m in at.markdown)
     assert "밤에 도로 소음이 커요" in md and "`내 글`" in md
-    assert [b.label for b in at.button].count("자세히") == 2
+    assert [b.label for b in at.button].count("자세히 보기 →") == 2
     assert not any(t.label == "제목 *" for t in at.text_input)        # 목록 화면에는 쓰기 칸이 없다
 
 
@@ -119,7 +119,8 @@ def test_community_list_write_button_goes_to_write(ui_fake):
 def test_community_list_empty_message(ui_fake):
     ui_fake.responses["/community/posts"] = []
     at = _app("pages.render_list()")
-    assert any("아직 등록된 후기가 없어요" in i.value for i in at.info)
+    assert any("아직 등록된 후기가 없어요" in str(m.value) for m in at.markdown)       # 빈 화면 카드
+    assert [b.label for b in at.button].count("발품 후기 쓰기") == 2                    # 위쪽 + 빈 카드의 다음 행동
 
 
 def test_community_detail_edit_only_for_mine(ui_fake):
@@ -173,7 +174,7 @@ def test_community_list_shows_like_counts_and_sort(ui_fake):
     # 정렬만 바꾸면 '검색 결과 없음'이 아니라 '아직 후기가 없음' 안내
     ui_fake.responses["/community/posts"] = []
     at.run()
-    assert any("아직 등록된 후기가 없어요" in i.value for i in at.info)
+    assert any("아직 등록된 후기가 없어요" in str(m.value) for m in at.markdown)
 
 
 def test_community_detail_like_toggle(ui_fake):

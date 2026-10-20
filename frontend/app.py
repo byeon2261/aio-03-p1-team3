@@ -1,18 +1,24 @@
 """Streamlit 진입점. 저장소 루트에서 `streamlit run frontend/app.py`.
 
 - 로그인 전: 로그인 페이지만.
-- 로그인 후: features/*/pages.py의 PAGES + R 상세 페이지 2개(세션 상세 20, 매물 상세 30)를 order 순으로.
+- 로그인 후: features/*/pages.py의 PAGES + R 상세 페이지 2개(세션 상세 20, 매물 상세 30).
+  사이드바는 묶음(NAV_GROUPS)으로: 내 집 보기(세션·전체 매물·발품 후기) / 계정(마이페이지) / 운영(운영자만).
   admin_only 페이지는 운영자에게만 보인다. hidden=True 페이지는 사이드바 메뉴에 안 보이고 버튼으로만 간다.
 """
 
 from __future__ import annotations
 
+import html
 import time
 from pathlib import Path
 
 import streamlit as st
 
-st.set_page_config(page_title="집 보기 메모 비교", page_icon="🏠", layout="wide")
+ASSETS = Path(__file__).resolve().parent / "assets"
+LOGO = str(ASSETS / "golabang_logo.png")      # 가로형 로고(사이드바 맨 위·로그인 화면)
+ICON = str(ASSETS / "golabang_icon.png")      # 아이콘(브라우저 탭·사이드바를 접었을 때)
+
+st.set_page_config(page_title="골라방", page_icon=ICON, layout="wide")
 # 공통 스타일(카드·탭·헤더). 색·글꼴은 .streamlit/config.toml [theme]. CSS만 있어 화면 자리를 차지하지 않는다
 st.html(Path(__file__).resolve().parent / "core" / "theme.css")
 
@@ -39,6 +45,12 @@ PAGE_ICONS = {
     "admin_logs": ":material/monitoring:",
     "evals": ":material/compare_arrows:",
 }
+# 사이드바 묶음(제목, 페이지 key 순서). 목록에 없는 key는 "내 집 보기" 끝에 붙는다
+NAV_GROUPS = (
+    ("내 집 보기", ("sessions", "map", "balpum_list", "session_detail", "listing_detail", "balpum_write")),
+    ("계정", ("mypage",)),
+    ("운영", ("admin_logs", "evals")),
+)
 _MD_SPECIAL = str.maketrans({c: "\\" + c for c in "\\`*_{}[]()<>#+-.!|~:"})
 
 
@@ -70,8 +82,16 @@ def wake_server() -> None:
 def sidebar() -> None:
     with st.sidebar:
         profile = state.current_profile() or {}
-        role = " :gray[· 운영자]" if state.is_admin() else ""
-        st.markdown(f"**{_md_escape(profile.get('nickname', '사용자'))}** 님{role}")
+        name = str(profile.get("nickname") or "사용자")
+        admin = ('<span style="margin-left:6px;padding:1px 8px;border-radius:6px;background:#EAEEFC;color:#3246D3;'
+                 'font-size:11px;font-weight:700">운영자</span>' if state.is_admin() else "")
+        st.markdown(
+            '<div style="display:flex;align-items:center;gap:10px">'
+            '<span style="width:32px;height:32px;border-radius:50%;background:#3246D3;color:#fff;display:flex;'
+            f'align-items:center;justify-content:center;font-weight:800;font-size:14px">{html.escape(name[:1])}</span>'
+            f'<span><b>{html.escape(name)}</b> 님{admin}</span></div>',
+            unsafe_allow_html=True,
+        )
         if st.button("로그아웃", key="logout", type="tertiary", icon=":material/logout:"):
             try:
                 api_post("/auth/logout")
@@ -90,18 +110,33 @@ def main() -> None:
                       position="hidden").run()
         return
 
+    st.logo(LOGO, icon_image=ICON, size="large")
     slots.register_sections(load_sections())
     items = [p for p in load_pages() + HOST_PAGES if state.is_admin() or not p["admin_only"]]
-    items.sort(key=lambda p: (p["order"], p["key"]))
-    default_key = next((p["key"] for p in items if not p.get("hidden")), items[0]["key"])
+    groups = _group_items(items)
+    default_key = next(p["key"] for _, ps in groups for p in ps if not p.get("hidden"))
     pages = {
         p["key"]: st.Page(p["render"], title=p["title"], url_path=p["key"], default=(p["key"] == default_key),
                           icon=PAGE_ICONS.get(p["key"]), visibility="hidden" if p.get("hidden") else "visible")
-        for p in items
+        for _, ps in groups for p in ps
     }
     nav.register_pages(pages)
     sidebar()
-    st.navigation(list(pages.values())).run()
+    st.navigation({title: [pages[p["key"]] for p in ps] for title, ps in groups}).run()
+
+
+def _group_items(items: list[dict]) -> list[tuple[str, list[dict]]]:
+    """NAV_GROUPS 순서로 묶는다. 보이는 페이지가 없는 묶음(일반 계정의 '운영')은 뺀다."""
+    by_key = {p["key"]: p for p in sorted(items, key=lambda p: (p["order"], p["key"]))}
+    out: list[tuple[str, list[dict]]] = []
+    placed: set[str] = set()
+    for title, keys in NAV_GROUPS:
+        ps = [by_key[k] for k in keys if k in by_key]
+        placed.update(p["key"] for p in ps)
+        out.append((title, ps))
+    rest = [p for k, p in by_key.items() if k not in placed]
+    out[0][1].extend(rest)
+    return [(title, ps) for title, ps in out if any(not p.get("hidden") for p in ps)]
 
 
 main()
