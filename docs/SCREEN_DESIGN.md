@@ -46,10 +46,10 @@ S2·S3는 여러 기능이 섹션을 붙이는 화면입니다(`core/slots.py`).
 | 화면 | order | 섹션 | 기능 | 코드 |
 |---|---|---|---|---|
 | S2 세션 상세 | 10 | 요약 숫자 카드, 매물 카드 목록(+사진·상태 칩·월 고정비), AI 정리 배너·지도, '매물' 제목 오른쪽 [새 매물 메모] → 모달 매물 이름·메모 입력 | F2·F3·F13 | `features/sessions/sections.py`, `summary.py`, `analyze_all.py` |
-| | 20 | 예산 | F11 | `features/budget/sections.py` |
-| | 25 | 항목 가중치 설정 | F12 | `features/scoring/sections.py` |
 | | 30 | 매물 비교표 | F6 | `features/comparison/comparison_table.py` |
 | | 35 | 적합도 순위 | F12 | `features/scoring/sections.py` |
+| | 40 | 예산(“예산 안만 보기” 토글은 위 비교표·순위에 바로 반영) | F11 | `features/budget/sections.py` |
+| | 45 | 항목 가중치 설정 | F12 | `features/scoring/sections.py` |
 | | 90 | ⚙️ 세션 관리(세션 제목·방문일 수정, 세션 삭제) | F2 | `features/sessions/sections.py` `render_session_manage` |
 | S3 매물 상세 | 10~12 | [⋯] 안 매물 삭제·확인(`menu` 10), 한 번짜리 안내(`notice` 11), 메모 편집(`memo` 탭 12) | F2·F3 | `features/sessions/sections.py` |
 | | 20~23 | AI 정리: 제목 오른쪽 버튼(`actions` 20), 안내·빈 상태 카드(`notice` 21), 숫자 카드(`overview` 22), 요약(`summary` 탭 23) | F4·F5 | `features/analysis/sections.py` |
