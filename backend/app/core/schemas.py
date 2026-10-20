@@ -83,6 +83,7 @@ class SessionOut(BaseModel):
 
 
 class ListingCreateIn(BaseModel):
+    name: str = Field(default="", max_length=30, description="매물 이름(필수, 1~30자)", examples=["1번방"])
     memo_text: str = Field(default="", max_length=MEMO_MAX_CHARS)
 
 
@@ -94,7 +95,7 @@ class ListingOut(BaseModel):
     id: str
     session_id: str
     listing_no: int
-    label: str                 # "N번 집"
+    label: str                 # 매물 이름(listings.name), 없으면 "N번 집"
     memo_text: str
     memo_updated_at: dt.datetime
     created_at: dt.datetime
@@ -211,6 +212,7 @@ class MyPhotoOut(PhotoOut):
     session_id: str
     session_title: str
     listing_no: int
+    listing_label: str = ""    # 매물 이름(listings.name), 없으면 "N번 집"
 
 
 class MeUpdateIn(BaseModel):

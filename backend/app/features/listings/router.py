@@ -16,7 +16,7 @@ from app.core.auth import CurrentUser, get_current_user
 from app.core.db import Database, get_user_db
 from app.core.events import emit
 from app.core.ownership import get_owned_listing, get_owned_session
-from app.core.repo import latest_analysis, list_listings
+from app.core.repo import latest_analysis, list_listings, listing_label
 from app.core.schemas import ListingCreateIn, ListingOut, ListingUpdateIn, OkOut
 from app.core.storage import Storage, get_storage
 from app.features.drafts.store import discard_drafts, listing_draft_key, new_draft_key
@@ -25,10 +25,7 @@ from app.features.sessions.validation import require_text
 router = APIRouter(tags=["listings"])
 
 MEMO_REQUIRED = "메모를 입력하세요."
-
-
-def listing_label(listing_no: int) -> str:
-    return f"{listing_no}번 집"
+NAME_REQUIRED = "매물 이름을 입력하세요."
 
 
 def listing_out(db: Database, row: dict) -> ListingOut:
@@ -38,7 +35,7 @@ def listing_out(db: Database, row: dict) -> ListingOut:
         id=str(row["id"]),
         session_id=str(row["session_id"]),
         listing_no=int(row["listing_no"]),
-        label=listing_label(int(row["listing_no"])),
+        label=listing_label(row),
         memo_text=row.get("memo_text") or "",
         memo_updated_at=row["memo_updated_at"],
         created_at=row["created_at"],
@@ -58,9 +55,10 @@ def list_session_listings(session_id: str, user: CurrentUser = Depends(get_curre
 def create_listing(session_id: str, body: ListingCreateIn, user: CurrentUser = Depends(get_current_user),
                    db: Database = Depends(get_user_db)) -> ListingOut:
     session = get_owned_session(db, user, session_id)
+    name = require_text(body.name, "name", NAME_REQUIRED)
     text = require_text(body.memo_text, "memo_text", MEMO_REQUIRED)
     # listing_no는 보내지 않는다(트리거가 tour_sessions.last_listing_no + 1을 넣는다)
-    row = db.insert("listings", {"session_id": str(session["id"]), "memo_text": text})[0]
+    row = db.insert("listings", {"session_id": str(session["id"]), "name": name, "memo_text": text})[0]
     discard_drafts([new_draft_key(user.auth_user_id, str(session["id"]))])
     return listing_out(db, row)
 

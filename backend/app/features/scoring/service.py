@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from app.core.db import UniqueViolation, is_valid_uuid
 from app.core.errors import AppError
 from app.core.registry import get_row_filter
-from app.core.repo import field_overrides, latest_analysis, list_listings
+from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
 from app.core.values import effective_values, monthly_cost
 from app.features.scoring.calc import fitness_score, rank
 from app.features.scoring.items import SCORE_ITEMS
@@ -196,7 +196,7 @@ def _filter_rows(db: Any, listings: list[dict]) -> list[dict]:
             values["monthly_cost_manwon"] = monthly_cost(values)
         newest = latest_analysis(db, lid, status=None)
         rows.append({"listing_id": lid, "listing_no": int(listing.get("listing_no") or 0),
-                     "label": f"{listing.get('listing_no')}번 집",
+                     "label": listing_label(listing),
                      "analysis_status": "none" if newest is None else (newest.get("status") or "failed"),
                      "needs_reanalysis": False, "values": values})
     return rows
@@ -244,7 +244,7 @@ def build_scores(db: Any, user: Any, session: dict, filter_names: Iterable[str] 
     scored = score_listings(db, setting, [str(x["id"]) for x in shown])
     ranks = rank({lid: s for lid, (s, _) in scored.items()})
     rows = [ScoreRow(listing_id=str(x["id"]), listing_no=int(x.get("listing_no") or 0),
-                     label=f"{x.get('listing_no')}번 집", score=scored[str(x["id"])][0],
+                     label=listing_label(x), score=scored[str(x["id"])][0],
                      rank=ranks[str(x["id"])], entered_count=scored[str(x["id"])][1],
                      total_items=len(SCORE_ITEMS))
             for x in shown]

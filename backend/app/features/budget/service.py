@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app.core.db import UniqueViolation
-from app.core.repo import field_overrides, latest_analysis, list_listings
+from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
 from app.core.schemas import BudgetIn, BudgetOut
 from app.core.values import effective_values, monthly_cost
 
@@ -181,7 +181,7 @@ def evaluate_session(db: Any, session: dict) -> tuple[dict | None, list[dict]]:
         values = listing_values(db, listing["id"])
         ev = evaluate(values, budget)
         no = int(listing.get("listing_no") or 0)
-        items.append({"listing_id": str(listing["id"]), "listing_no": no, "label": f"{no}번 집",
+        items.append({"listing_id": str(listing["id"]), "listing_no": no, "label": listing_label(listing),
                       "evaluation": ev, "next_action": next_action(values, budget, ev)})
     return budget, items
 

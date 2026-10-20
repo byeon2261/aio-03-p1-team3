@@ -26,6 +26,10 @@ from features.sessions.memo_editor import render_memo_editor
 from features.map.listing_map import render_session_map
 
 TITLE_MAX_CHARS = 100
+NAME_MAX_CHARS = 30                  # listings.name(0009)과 같은 길이
+NAME_LABEL = "매물 이름 *"
+NAME_PLACEHOLDER = "예: 1번방"
+NAME_REQUIRED = "매물 이름을 입력하세요. (예: 1번방)"
 MEMO_PLACEHOLDER = "예: 보증금 500 / 월세 45 / 관리비 7(인터넷 포함). 3층, 남향. 채광 좋음, 수압 보통. 역까지 도보 8분."
 CLEANUP_FAILED_MESSAGE = "사진 정리에 실패했습니다. 다시 삭제하세요"
 
@@ -220,22 +224,39 @@ LISTINGS_SPACING_CSS = (
 )
 
 
+def _name_key(sid: str) -> str:
+    return f"p1_new_memo_name:{sid}"
+
+
+def _name_problem(sid: str) -> str | None:
+    """저장 전 확인: 매물 이름은 필수."""
+    return None if str(st.session_state.get(_name_key(sid)) or "").strip() else NAME_REQUIRED
+
+
 def _save_new_memo(sid: str, text: str) -> str:
-    created = api_post(f"/sessions/{sid}/listings", json={"memo_text": text})
+    name = str(st.session_state.get(_name_key(sid)) or "").strip()
+    created = api_post(f"/sessions/{sid}/listings", json={"name": name, "memo_text": text})
+    st.session_state[f"{_name_key(sid)}:reset"] = True     # 다음에 모달을 열면 이름 칸이 비어 있다
     # 저장하면 모달이 닫히고 화면 전체를 다시 그린다. 안내는 화면 위쪽(show_flash)과 토스트로 보여 준다.
     flash("session_detail", f"{created['label']}을(를) 저장했습니다. 매물을 눌러 분석을 실행하거나 다음 집 메모를 적으세요.")
     return ""
 
 
 def _new_memo_dialog(session: dict) -> None:
-    """새 매물 메모 모달. 입력칸·초안 자동 저장·저장은 기존 메모 입력 부품(render_memo_editor) 그대로."""
+    """새 매물 메모 모달. 맨 위 매물 이름(필수, 예: 1번방) 아래 메모 입력칸.
+    메모 입력칸·초안 자동 저장·저장은 기존 메모 입력 부품(render_memo_editor) 그대로."""
     sid = session["id"]
 
     @st.dialog(NEW_MEMO_LABEL, width="large")
     def _dialog() -> None:
+        if st.session_state.pop(f"{_name_key(sid)}:reset", False):
+            st.session_state[_name_key(sid)] = ""
+        st.text_input(NAME_LABEL, key=_name_key(sid), max_chars=NAME_MAX_CHARS, placeholder=NAME_PLACEHOLDER,
+                      help="비교표·순위·지도에 이 이름으로 보입니다.")
         render_memo_editor(scope=f"new:{sid}", draft_path=f"/sessions/{sid}/draft", initial_text="",
                            label="이번 집 메모", placeholder=MEMO_PLACEHOLDER, save_label="메모 저장",
-                           on_save=lambda text: _save_new_memo(sid, text), clear_after_save=True)
+                           on_save=lambda text: _save_new_memo(sid, text), clear_after_save=True,
+                           validate=lambda: _name_problem(sid))
 
     _dialog()
 

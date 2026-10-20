@@ -93,7 +93,8 @@ def _password_form() -> None:
 
 # ------------------------------------------------------------------ 내 사진
 def _photo_caption(photo: dict) -> str:
-    return f"{photo.get('session_title') or '세션'} · {photo.get('listing_no')}번 집 · {fmt_kst(photo.get('created_at'))}"
+    label = photo.get("listing_label") or f"{photo.get('listing_no')}번 집"
+    return f"{photo.get('session_title') or '세션'} · {label} · {fmt_kst(photo.get('created_at'))}"
 
 
 def _open_listing_button(photo: dict) -> None:

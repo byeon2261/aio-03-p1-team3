@@ -13,6 +13,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.core.errors import AppError
+from app.core.repo import listing_label
 from app.core.schemas import MyPhotoOut, PhotoOut
 from app.core.storage import Storage, StorageError
 
@@ -96,6 +97,7 @@ def to_my_photo_out(row: dict[str, Any], listing: dict[str, Any], session: dict[
         session_id=str(session["id"]),
         session_title=session.get("title") or "",
         listing_no=int(listing["listing_no"]),
+        listing_label=listing_label(listing),
     )
 
 

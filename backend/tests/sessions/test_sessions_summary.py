@@ -277,6 +277,8 @@ def test_new_memo_button_opens_modal_and_saves(fake):
     at.button(key=f"p1_new_memo_open:{SID}").click().run()
     assert not at.exception, at.exception
     assert [t.label for t in at.text_area] == ["이번 집 메모"]           # 모달 안 메모 입력칸
+    name = at.text_input(key=f"p1_new_memo_name:{SID}")                  # 메모 입력칸 위 매물 이름(필수)
+    assert name.label == "매물 이름 *" and name.max_chars == 30 and name.placeholder == "예: 1번방"
     assert {f"p1_memo:save_btn:new:{SID}", f"p1_memo:draft_btn:new:{SID}"} <= {b.key for b in at.button}
     # 모달 안 클릭은 모달(fragment)만 다시 그린다. AppTest는 앱 전체를 다시 돌려 모달이 닫히므로
     # 저장 동작은 아래 test_save_new_memo_posts_and_flashes에서 함수로 확인한다.
@@ -291,9 +293,51 @@ def test_save_new_memo_posts_and_flashes(monkeypatch):
                         lambda path, json=None, **kw: calls.append((path, json)) or {"id": "n", "label": "5번 집"})
     flashed = []
     monkeypatch.setattr(sections, "flash", lambda where, msg, kind="success": flashed.append((where, msg)))
+    st.session_state[f"p1_new_memo_name:{SID}"] = "  1번방 "
     assert sections._save_new_memo(SID, "보증금 500 월세 40") == ""       # 모달 안에는 문구를 남기지 않는다
-    assert calls == [(f"/sessions/{SID}/listings", {"memo_text": "보증금 500 월세 40"})]
+    assert calls == [(f"/sessions/{SID}/listings", {"name": "1번방", "memo_text": "보증금 500 월세 40"})]
+    assert st.session_state[f"p1_new_memo_name:{SID}:reset"] is True       # 다음에 열면 이름 칸이 빈다
     assert flashed[0][0] == "session_detail" and "5번 집을(를) 저장했습니다" in flashed[0][1]
+
+
+def test_new_memo_name_is_required(monkeypatch):
+    import streamlit as st
+    from features.sessions import sections
+
+    for blank in ("", "   ", None):
+        st.session_state[f"p1_new_memo_name:{SID}"] = blank
+        assert sections._name_problem(SID) == "매물 이름을 입력하세요. (예: 1번방)"
+    st.session_state[f"p1_new_memo_name:{SID}"] = "1번방"
+    assert sections._name_problem(SID) is None
+
+
+def test_memo_editor_validate_blocks_save(fake):
+    """validate가 문구를 돌려주면 경고만 보이고 저장하지 않는다(새 메모의 이름 확인에 쓴다)."""
+    from streamlit.testing.v1 import AppTest
+
+    script = f"""
+import sys
+sys.path.insert(0, {str(FRONTEND_DIR)!r})
+import streamlit as st
+from features.sessions import memo_editor
+from core.api import ApiError
+saved = st.session_state.setdefault("saved", [])
+def _get(path, **kw):
+    raise ApiError(404, "DRAFT_NOT_FOUND", "없음")
+memo_editor.api_get = _get
+memo_editor.api_put = lambda path, json=None, **kw: {{"saved_at": None}}
+memo_editor.render_memo_editor(scope="t", draft_path="/d", on_save=lambda text: saved.append(text) or "",
+                               validate=lambda: None if st.session_state.get("ok") else "이름을 입력하세요.")
+"""
+    at = AppTest.from_string(script, default_timeout=10)
+    at.run()
+    at.text_area[0].set_value("메모").run()
+    at.button(key="p1_memo:save_btn:t").click().run()
+    assert [w.value for w in at.warning] == ["이름을 입력하세요."] and at.session_state["saved"] == []
+    at.session_state["ok"] = True
+    at.button(key="p1_memo:save_btn:t").click().run()
+    assert not at.exception, at.exception
+    assert at.session_state["saved"] == ["메모"]
 
 
 def test_first_memo_button_opens_modal_when_no_listings(fake):

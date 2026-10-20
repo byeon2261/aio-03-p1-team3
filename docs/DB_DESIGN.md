@@ -28,7 +28,7 @@
 
 | 영역 | 테이블 | 기능 | 마이그레이션 |
 |---|---|---|---|
-| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql` |
+| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql`, `0009_listing_name.sql` |
 | 사진 | `photos` | F10 매물 사진 | `0006_photos.sql` |
 | 예산 | `session_budgets` | F11 세션 예산 | `0007_budget.sql` |
 | 항목 가중치 | `weight_profiles`, `weight_items`, `listing_satisfactions`, `session_scoring` | F12 적합도 점수 | `0120_scoring.sql` |
@@ -118,6 +118,7 @@ erDiagram
         string memo_text "메모 원문"
         datetime memo_updated_at "메모 수정 시각"
         datetime created_at "만든 시각"
+        string name "매물 이름(예: 1번방, 없으면 N번 집)"
     }
     Analysis {
         UUID id PK "AI 분석 1회"
@@ -261,7 +262,7 @@ erDiagram
 | AuthAccount | 로그인 계정 | id | Supabase Auth가 관리(외부 엔티티) |
 | User | 서비스 사용자 | id | 계정당 하나. 역할 user·admin |
 | TourSession | 집 보기 하루(세션) | id | 사용자의 매물 묶음 |
-| Listing | 본 집 한 곳(매물) | id (자연 키: 세션 + 번호) | 메모 원문만 가진다 |
+| Listing | 본 집 한 곳(매물) | id (자연 키: 세션 + 번호) | 메모 원문과 사용자가 붙인 이름을 가진다 |
 | Analysis | 메모를 AI로 정리한 1회 결과 | id | 재분석하면 새 인스턴스가 생긴다 |
 | Feedback | 분석 결과에 대한 사용자 수정·평가 1건 | id | 필드 수정 또는 전체 평가 |
 | Photo | 매물 사진 | id | 파일은 Storage |
@@ -367,6 +368,7 @@ erDiagram
         text memo_text "NOT NULL DEFAULT ''"
         timestamptz memo_updated_at "NOT NULL DEFAULT now()"
         timestamptz created_at "NOT NULL DEFAULT now()"
+        text name "1~30자, null이면 N번 집 (0009)"
     }
     analyses {
         uuid id PK
@@ -611,7 +613,7 @@ erDiagram
 
 ### 5.3 `listings` — 매물(집 한 곳)
 
-메모 원문만 둔다. AI가 정리한 값은 `analyses`, 사용자 수정값은 `feedback`에 있다(7.3절).
+메모 원문과 사용자가 붙인 매물 이름을 둔다. AI가 정리한 값은 `analyses`, 사용자 수정값은 `feedback`에 있다(7.3절).
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -621,6 +623,7 @@ erDiagram
 | `memo_text` | text | 0~5000자 [API] | NOT NULL | `''` | 사용자 UPDATE는 이 컬럼만 | 사용자가 쓴 메모 원문 |
 | `memo_updated_at` | timestamptz | — | NOT NULL | `now()` | 트리거 `touch_memo_updated_at` | 메모가 바뀐 시각. 재분석 필요 판단에 쓴다 |
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 만든 시각(UTC) |
+| `name` | text | 1~30자 | NULL | — | CHECK `listings_name_len`(0009). 사용자 UPDATE 권한 없음 | 매물 이름(예: "1번방"). 새 메모 저장 때 필수 [API]. null(0009 이전 매물)이면 화면에 "N번 집" |
 
 ### 5.4 `analyses` — AI 분석 결과
 

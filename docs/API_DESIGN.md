@@ -245,7 +245,7 @@ Content-Type: application/json
 | E11 | `PATCH /sessions/{session_id}` | 본인 | `SessionUpdateIn` | `SessionOut` | 보낸 필드만 고친다. `title` null·빈 값 422, `visit_date: null`은 방문일 지우기. 404 `SESSION_NOT_FOUND` |
 | E12 | `DELETE /sessions/{session_id}` | 본인 | - | `OkOut` | 사진 파일 → 초안 → 세션 행 순서로 지우고, 매물·분석·피드백·예산 등은 DB CASCADE. 사진 파일 삭제 실패 503 `CLEANUP_FAILED`(세션은 남아 다시 삭제 가능). 404 `SESSION_NOT_FOUND` |
 | E13 | `GET /sessions/{session_id}/listings` | 본인 | - | `list[ListingOut]` | `listing_no` 오름차순. 404 `SESSION_NOT_FOUND` |
-| E14 | `POST /sessions/{session_id}/listings` | 본인 | `ListingCreateIn` | `ListingOut` | 메모는 공백 제거 후 1~5000자. `listing_no`는 DB 트리거가 매긴다. 저장 성공 시 그 세션의 새 매물 초안을 지운다. 404 `SESSION_NOT_FOUND` |
+| E14 | `POST /sessions/{session_id}/listings` | 본인 | `ListingCreateIn` | `ListingOut` | 매물 이름(`name`, 예: "1번방")은 공백 제거 후 1~30자로 필수(빈 값 422 "매물 이름을 입력하세요."). 메모는 공백 제거 후 1~5000자. `listing_no`는 DB 트리거가 매긴다. 저장 성공 시 그 세션의 새 매물 초안을 지운다. 404 `SESSION_NOT_FOUND` |
 | E15 | `GET /listings/{listing_id}` | 본인 | - | `ListingOut` | 404 `LISTING_NOT_FOUND`(남의 매물 포함) |
 | E16 | `PATCH /listings/{listing_id}` | 본인 | `ListingUpdateIn` | `ListingOut` | 메모만 고친다(빈 값 422). 메모가 바뀌면 `memo_updated_at` 갱신 → 분석이 있으면 `needs_reanalysis: true`. 그 매물의 초안을 지운다. 404 `LISTING_NOT_FOUND` |
 | E17 | `DELETE /listings/{listing_id}` | 본인 | - | `OkOut` | 사진 파일 → 초안 → 매물 행. 분석·피드백·사진 행·위치·만족도는 CASCADE. 503 `CLEANUP_FAILED`, 404 `LISTING_NOT_FOUND` |
@@ -255,7 +255,7 @@ POST /sessions/6f1c2a3e-0000-4000-8000-000000000001/listings
 Authorization: Bearer <access_token>
 Content-Type: application/json
 
-{"memo_text": "역앞 원룸. 500에 45, 관리비 7(수도·인터넷 포함). 3층 남향. 채광 좋음, 곰팡이 없음. 수압 확인 못함."}
+{"name": "1번방", "memo_text": "역앞 원룸. 500에 45, 관리비 7(수도·인터넷 포함). 3층 남향. 채광 좋음, 곰팡이 없음. 수압 확인 못함."}
 ```
 
 ```json
@@ -263,7 +263,7 @@ Content-Type: application/json
   "id": "a1000000-0000-4000-8000-000000000001",
   "session_id": "6f1c2a3e-0000-4000-8000-000000000001",
   "listing_no": 1,
-  "label": "1번 집",
+  "label": "1번방",
   "memo_text": "역앞 원룸. 500에 45, 관리비 7(수도·인터넷 포함). 3층 남향. 채광 좋음, 곰팡이 없음. 수압 확인 못함.",
   "memo_updated_at": "2026-10-18T12:47:24Z",
   "created_at": "2026-10-18T12:47:24Z",
@@ -435,7 +435,7 @@ Content-Type: application/json
 | E29 | `DELETE /photos/{photo_id}` | 본인 | - | `OkOut` | 파일 먼저 지우고 행 삭제. 파일 삭제 실패 503 `CLEANUP_FAILED`(행 유지), 404 `PHOTO_NOT_FOUND` |
 | E30 | `PATCH /me` | 본인 | `NicknameUpdateIn` | `ProfileOut` | 닉네임만 바꾼다(1~20자, 제어 문자 불가). `role` 등 다른 필드는 무시 |
 | E31 | `POST /me/password` | 본인 | `PasswordChangeWithCurrentIn` | `OkOut` | 현재 비밀번호를 확인한 뒤 바꾼다. 현재 비밀번호 틀림 401 `INVALID_CREDENTIALS`, 새 비밀번호가 같음 422(`reason: same_password`), 인증 서버 실패 503 `CONFIG_MISSING` |
-| E32 | `GET /me/photos` | 본인 | - | `list[MyPhotoOut]` | 내 모든 사진, 최신순. 세션 제목·매물 번호 포함 |
+| E32 | `GET /me/photos` | 본인 | - | `list[MyPhotoOut]` | 내 모든 사진, 최신순. 세션 제목·매물 번호·매물 이름 포함 |
 | E33 | `GET /me/summary` | 본인 | - | `MySummaryWithRecentOut` | 세션·매물·분석·사진·피드백 수 + 최근 세션 5개 |
 
 ```json
@@ -769,6 +769,7 @@ Content-Type: application/json
 
 | 필드 | 타입 | 필수 | 기본값 | 제약 | 설명 | 예시 |
 |---|---|---|---|---|---|---|
+| `name` | string | 선택 | `""` | max_length=30 | 매물 이름(필수, 1~30자). 앞뒤 공백 제거 후 1자 이상이어야 저장, 빈 값은 422. `listings.name`(0009)에 저장 | `"1번방"` |
 | `memo_text` | string | 선택 | `""` | max_length=5000 | 메모(앞뒤 공백 제거 후 1자 이상이어야 저장, 빈 값은 422) | `"역 5분, 500/45, 관리비 7, 남향, 수압 좋음"` |
 
 #### ListingUpdateIn — `core/schemas.py`
@@ -784,7 +785,7 @@ Content-Type: application/json
 | `id` | string | 필수 | - |  | 고유 ID(UUID 문자열) | `"a1000000-0000-4000-8000-000000000001"` |
 | `session_id` | string | 필수 | - |  | 집 보기 세션 ID | `"6f1c2a3e-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `1` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"1번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"1번 집"` |
 | `memo_text` | string | 필수 | - |  | 매물 메모 원문 | `"역 5분, 500/45, 관리비 7, 남향, 수압 좋음"` |
 | `memo_updated_at` | datetime | 필수 | - |  | 메모를 마지막으로 바꾼 시각(DB 트리거) | `"2026-10-18T05:30:00Z"` |
 | `created_at` | datetime | 필수 | - |  | 만든 시각(UTC) | `"2026-10-18T05:30:00Z"` |
@@ -883,7 +884,7 @@ Content-Type: application/json
 |---|---|---|---|---|---|---|
 | `listing_id` | string | 필수 | - |  | 매물 ID | `"a1000000-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `1` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"1번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"1번 집"` |
 | `analysis_status` | "none" \| "success" \| "failed" | 필수 | - |  | 최신 분석 상태 | `"success"` |
 | `needs_reanalysis` | boolean | 선택 | `false` |  | 분석 뒤 메모가 바뀌어 다시 분석해야 하는지 | `false` |
 | `values` | dict[string, any] | 선택 | `{}` |  | 열 키 → 값(사용자 수정 반영, 분석이 없으면 {}) | `{"deposit_manwon": 500, "monthly_cost_manwon": 52}` |
@@ -976,6 +977,7 @@ Content-Type: application/json
 | `session_id` | string | 필수 | - |  | 집 보기 세션 ID | `"6f1c2a3e-0000-4000-8000-000000000001"` |
 | `session_title` | string | 필수 | - |  | 사진이 속한 세션 제목 | `"토요일 집 보기"` |
 | `listing_no` | integer | 필수 | - |  | 사진이 속한 매물 번호 | `1` |
+| `listing_label` | string | 선택 | `""` |  | 사진이 속한 매물 이름(없으면 "N번 집") | `"1번방"` |
 
 #### NicknameUpdateIn (상속: MeUpdateIn) — `features/mypage/router.py`
 
@@ -1042,7 +1044,7 @@ Content-Type: application/json
 |---|---|---|---|---|---|---|
 | `listing_id` | string | 필수 | - |  | 매물 ID | `"a1000000-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `2` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"2번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"2번 집"` |
 | `status` | "within" \| "over" \| "unknown" \| null | 선택 | `null` |  | within · over · unknown. 예산 미설정이면 null | `"unknown"` |
 | `status_label` | string | 필수 | - |  | 예산 안 · 예산 초과 · 판단 불가, 미설정이면 "-" | `"판단 불가"` |
 | `reason` | string | 필수 | - |  | 판정 사유 | `"관리비 미기재"` |
@@ -1151,7 +1153,7 @@ Content-Type: application/json
 |---|---|---|---|---|---|---|
 | `listing_id` | string | 필수 | - |  | 매물 ID | `"a1000000-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `1` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"1번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"1번 집"` |
 | `score` | integer \| null | 선택 | `null` |  | 적합도 0~100. null = 만족도 미입력 | `78` |
 | `rank` | integer \| null | 선택 | `null` |  | 이 응답 rows 안의 순위(같은 점수는 같은 순위) | `1` |
 | `entered_count` | integer | 선택 | `0` |  | 만족도를 입력한 항목 수 | `5` |
@@ -1281,7 +1283,7 @@ Content-Type: application/json
 |---|---|---|---|---|---|---|
 | `listing_id` | string | 필수 | - |  | 매물 ID | `"a1000000-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `1` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"1번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"1번 집"` |
 | `location` | LocationOut | 필수 | - |  | 위치(nested LocationOut) | (하위 모델 예시 참고) |
 | `deposit_manwon` | integer \| null | 선택 | `null` |  | 보증금(만원) | `1000` |
 | `monthly_rent_manwon` | integer \| null | 선택 | `null` |  | 월세(만원) | `40` |
@@ -1294,7 +1296,7 @@ Content-Type: application/json
 |---|---|---|---|---|---|---|
 | `listing_id` | string | 필수 | - |  | 매물 ID | `"a1000000-0000-4000-8000-000000000001"` |
 | `listing_no` | integer | 필수 | - |  | 세션 안 매물 번호(DB 트리거가 매김, 지운 번호는 다시 쓰지 않음) | `1` |
-| `label` | string | 필수 | - |  | 화면 표시 이름("N번 집") | `"1번 집"` |
+| `label` | string | 필수 | - |  | 화면 표시 이름. 매물 이름(`listings.name`, 예: "1번방")이 있으면 그것, 없으면(0009 이전 매물) "N번 집"(`core.repo.listing_label`) | `"1번 집"` |
 | `location` | LocationOut | 필수 | - |  | 위치(nested LocationOut) | (하위 모델 예시 참고) |
 | `deposit_manwon` | integer \| null | 선택 | `null` |  | 보증금(만원) | `1000` |
 | `monthly_rent_manwon` | integer \| null | 선택 | `null` |  | 월세(만원) | `40` |

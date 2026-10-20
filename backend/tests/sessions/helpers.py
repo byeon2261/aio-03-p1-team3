@@ -23,8 +23,12 @@ def create_session(client, title: str = "토요일 집 보기", visit_date: str 
     return r.json()
 
 
-def create_listing(client, session_id: str, memo: str = "보증금 500 월세 40 관리비 7 채광 좋음") -> dict:
-    r = client.post(f"/sessions/{session_id}/listings", json={"memo_text": memo})
+def create_listing(client, session_id: str, memo: str = "보증금 500 월세 40 관리비 7 채광 좋음",
+                   name: str | None = None) -> dict:
+    """name을 주지 않으면 지금까지처럼 "N번 집"(이 세션의 다음 번호)으로 저장한다."""
+    if name is None:
+        name = f"{len(client.get(f'/sessions/{session_id}/listings').json()) + 1}번 집"
+    r = client.post(f"/sessions/{session_id}/listings", json={"name": name, "memo_text": memo})
     assert r.status_code == 200, r.text
     return r.json()
 

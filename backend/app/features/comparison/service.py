@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from app.core.analysis_contract import CHECKLIST, needs_reanalysis
 from app.core.ownership import get_owned_session
 from app.core.registry import ColumnValue, get_column_providers, get_row_filter
-from app.core.repo import field_overrides, latest_analysis, list_listings
+from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
 from app.core.schemas import ComparisonOut, ComparisonRow, FieldTitle
 from app.core.values import effective_values, monthly_cost
 
@@ -83,7 +83,7 @@ def _base_row(db: Any, listing: dict) -> dict:
     return {
         "listing_id": lid,
         "listing_no": int(listing.get("listing_no") or 0),
-        "label": f"{listing.get('listing_no')}번 집",
+        "label": listing_label(listing),
         "analysis_status": status,
         "needs_reanalysis": needs_reanalysis(listing, newest),
         "values": values,

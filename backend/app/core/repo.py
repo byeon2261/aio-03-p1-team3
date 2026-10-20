@@ -5,6 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 
+LISTING_NAME_MAX = 30
+
+
+def listing_label(listing: dict) -> str:
+    """화면에 보일 매물 이름. 사용자가 적은 이름(listings.name, 0009)이 있으면 그것, 없으면 "N번 집"."""
+    name = (listing.get("name") or "").strip()
+    return name or f"{listing.get('listing_no')}번 집"
+
+
 def list_listings(db: Any, session_id: Any) -> list[dict]:
     """세션의 매물을 listing_no 오름차순으로."""
     return db.select("listings", {"session_id": str(session_id)}, order_by="listing_no")

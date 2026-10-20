@@ -216,4 +216,4 @@ def test_drafts_kv_unavailable_503(client_as, make_user, memory_kv):
               c.delete(f"/sessions/{s['id']}/draft")):
         assert r.status_code == 503 and error_code(r) == "KV_UNAVAILABLE"
     # 메모 저장은 그대로 동작
-    assert c.post(f"/sessions/{s['id']}/listings", json={"memo_text": "저장"}).status_code == 200
+    assert c.post(f"/sessions/{s['id']}/listings", json={"name": "1번방", "memo_text": "저장"}).status_code == 200

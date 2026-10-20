@@ -90,8 +90,8 @@ def test_listings_deleted_number_is_not_reused(client_as, make_user):
     create_listing(c, s["id"], "둘")
     third = create_listing(c, s["id"], "셋")
     assert c.delete(f"/listings/{third['id']}").status_code == 200   # 마지막 번호 삭제
-    fourth = create_listing(c, s["id"], "넷")
-    assert fourth["listing_no"] == 4 and fourth["label"] == "4번 집"
+    fourth = create_listing(c, s["id"], "넷", name="넷째 집")
+    assert fourth["listing_no"] == 4 and fourth["label"] == "넷째 집"
     listed = c.get(f"/sessions/{s['id']}/listings").json()
     assert [x["listing_no"] for x in listed] == [1, 2, 4]
 
@@ -107,7 +107,7 @@ def test_listings_numbers_are_per_session(client_as, make_user):
 def test_listings_client_cannot_choose_number(client_as, make_user):
     c = p1_client(client_as, make_user())
     s = create_session(c)
-    r = c.post(f"/sessions/{s['id']}/listings", json={"memo_text": "메모", "listing_no": 99})
+    r = c.post(f"/sessions/{s['id']}/listings", json={"name": "1번방", "memo_text": "메모", "listing_no": 99})
     assert r.status_code == 200 and r.json()["listing_no"] == 1
 
 
@@ -115,7 +115,7 @@ def test_listings_client_cannot_choose_number(client_as, make_user):
 def test_listings_blank_memo_422(client_as, make_user, memory_db):
     c = p1_client(client_as, make_user())
     s = create_session(c)
-    for body in ({"memo_text": ""}, {"memo_text": "   \n "}, {}):
+    for body in ({"name": "1번방", "memo_text": ""}, {"name": "1번방", "memo_text": "   \n "}, {"name": "1번방"}):
         r = c.post(f"/sessions/{s['id']}/listings", json=body)
         assert r.status_code == 422 and error_code(r) == "VALIDATION_ERROR", body
     assert memory_db.select("listings") == []
@@ -130,9 +130,36 @@ def test_listings_too_long_memo_422_without_echo(client_as, make_user):
     c = p1_client(client_as, make_user())
     s = create_session(c)
     long_memo = "가" * (MEMO_MAX_CHARS + 1)
-    r = c.post(f"/sessions/{s['id']}/listings", json={"memo_text": long_memo})
+    r = c.post(f"/sessions/{s['id']}/listings", json={"name": "1번방", "memo_text": long_memo})
     assert r.status_code == 422 and error_code(r) == "VALIDATION_ERROR"
     assert long_memo not in r.text   # 오류 응답에 메모 원문을 담지 않는다
+
+
+def test_listings_name_required_and_used_as_label(client_as, make_user, memory_db):
+    """새 매물 메모는 이름(예: "1번방")이 있어야 저장되고, 그 이름이 화면 이름(label)이 된다."""
+    c = p1_client(client_as, make_user())
+    s = create_session(c)
+    for body in ({"memo_text": "메모"}, {"name": "", "memo_text": "메모"}, {"name": "  ", "memo_text": "메모"}):
+        r = c.post(f"/sessions/{s['id']}/listings", json=body)
+        assert r.status_code == 422 and error_code(r) == "VALIDATION_ERROR", body
+        assert r.json()["error"]["detail"]["fields"][0]["loc"] == ["body", "name"]
+        assert r.json()["error"]["message"] == "매물 이름을 입력하세요."
+    r = c.post(f"/sessions/{s['id']}/listings", json={"name": "가" * 31, "memo_text": "메모"})
+    assert r.status_code == 422 and error_code(r) == "VALIDATION_ERROR"
+    assert memory_db.select("listings") == []
+
+    made = c.post(f"/sessions/{s['id']}/listings", json={"name": "  1번방 ", "memo_text": "메모"}).json()
+    assert made["label"] == "1번방" and made["listing_no"] == 1
+    assert memory_db.select("listings")[0]["name"] == "1번방"            # 앞뒤 공백은 빼고 저장
+    assert c.get(f"/sessions/{s['id']}/listings").json()[0]["label"] == "1번방"
+
+
+def test_listings_without_name_keep_number_label(client_as, make_user, memory_db):
+    """이름 열(0009)이 생기기 전에 만든 매물은 지금처럼 "N번 집"."""
+    c = p1_client(client_as, make_user())
+    s = create_session(c)
+    memory_db.insert("listings", {"session_id": s["id"], "memo_text": "예전 메모"})
+    assert c.get(f"/sessions/{s['id']}/listings").json()[0]["label"] == "1번 집"
 
 
 # ------------------------------------------------------------------ 수정·재분석 표시
@@ -241,3 +268,15 @@ def test_listings_save_works_without_kv(client_as, make_user, memory_kv):
     r = c.patch(f"/listings/{lst['id']}", json={"memo_text": "KV 없이 수정"})
     assert r.status_code == 200 and r.json()["memo_text"] == "KV 없이 수정"
     assert c.delete(f"/listings/{lst['id']}").status_code == 200
+
+
+def test_listing_name_shown_in_other_session_screens(client_as, make_user):
+    """비교표·예산 판정·적합도 순위도 같은 매물 이름을 쓴다(core.repo.listing_label)."""
+    c = p1_client(client_as, make_user())
+    s = create_session(c)
+    create_listing(c, s["id"], name="1번방")
+    create_listing(c, s["id"], name="역 앞 오피스텔")
+    names = ["1번방", "역 앞 오피스텔"]
+    assert [r["label"] for r in c.get(f"/sessions/{s['id']}/comparison").json()["rows"]] == names
+    assert [r["label"] for r in c.get(f"/sessions/{s['id']}/budget/evaluations").json()["items"]] == names
+    assert sorted(r["label"] for r in c.get(f"/sessions/{s['id']}/scores").json()["rows"]) == sorted(names)
