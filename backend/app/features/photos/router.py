@@ -24,6 +24,7 @@ from app.features.photos.service import (
     build_storage_path,
     delete_files,
     max_photo_bytes,
+    signed_many,
     to_photo_out,
     validate_photo,
 )
@@ -87,7 +88,8 @@ def list_photos(
     listing = get_owned_listing(db, user, listing_id)
     rows = db.select("photos", {"listing_id": str(listing["id"]), "profile_id": user.profile_id},
                      order_by="created_at")
-    return [to_photo_out(r, storage, user.access_token) for r in rows]
+    signed = signed_many(storage, rows, user.access_token)   # 서명 URL은 한 번에
+    return [to_photo_out(r, storage, user.access_token, signed[r["storage_path"]]) for r in rows]
 
 
 @router.delete("/photos/{photo_id}", response_model=OkOut)

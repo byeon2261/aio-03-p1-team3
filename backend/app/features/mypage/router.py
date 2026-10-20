@@ -25,7 +25,7 @@ from app.core.schemas import (
     SessionOut,
 )
 from app.core.storage import Storage, get_storage
-from app.features.photos.service import to_my_photo_out
+from app.features.photos.service import signed_many, to_my_photo_out
 
 router = APIRouter(tags=["mypage"])
 
@@ -129,14 +129,16 @@ def my_photos(
         for r in db.select("tour_sessions", {"id": session_ids})
         if str(r.get("profile_id")) == str(user.profile_id)
     }
-    out: list[MyPhotoOut] = []
+    shown: list[tuple[dict, dict, dict]] = []
     for p in photos:
         listing = listings.get(str(p["listing_id"]))
         session = sessions.get(str(listing["session_id"])) if listing else None
         if listing is None or session is None:
             continue  # 삭제 중인 매물 등
-        out.append(to_my_photo_out(p, listing, session, storage, user.access_token))
-    return out
+        shown.append((p, listing, session))
+    signed = signed_many(storage, [p for p, _, _ in shown], user.access_token)   # 서명 URL은 한 번에
+    return [to_my_photo_out(p, listing, session, storage, user.access_token, signed[p["storage_path"]])
+            for p, listing, session in shown]
 
 
 # ------------------------------------------------------------------ 요약
