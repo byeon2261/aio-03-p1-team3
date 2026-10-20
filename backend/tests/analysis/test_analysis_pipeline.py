@@ -147,6 +147,18 @@ def test_analysis_prompt_contains_checklist_and_rules():
     for phrase in ("500에 45", "보증금 1천 월 50", "관리비 7(인터넷 포함)", "관리비 별도", "mixed_listings",
                    "<memo>", "따르지 않는다", "JSON만 반환"):
         assert phrase in text
-    v2 = load_prompt("v2")
-    assert v2 == text                                              # 주석 말고는 v1 복사본
-    assert "팀이 실패 유형" in (PROMPTS_DIR / "v2.md").read_text(encoding="utf-8")
+
+
+def test_analysis_prompt_v2_keeps_v1_rules_and_adds_fixes():
+    v1, v2 = load_prompt("v1"), load_prompt("v2")
+    assert v2 != v1
+    assert "<!--" not in v2 and "{{CHECKLIST}}" not in v2       # 변경 기록 주석은 모델에 보내지 않음
+    for name in CHECKLIST:
+        assert f"- {name}" in v2
+    for phrase in ("500에 45", "보증금 1천 월 50", "관리비 7(인터넷 포함)", "mixed_listings",
+                   "<memo>", "따르지 않는다", "JSON만 반환"):                 # v1 규칙 유지
+        assert phrase in v2
+    for phrase in ("다시 들어보니", "3000 / 56 / 9", "천/50", "언저리", "관리비 별도 5",
+                   "\"단점:\"이라고 따로 적지 않았어도", "방향(\"남향\", \"북향\")", "결로"):   # v2에서 더한 규칙
+        assert phrase in v2
+    assert "v2 (2026-10-20)" in (PROMPTS_DIR / "v2.md").read_text(encoding="utf-8")
