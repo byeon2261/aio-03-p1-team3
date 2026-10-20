@@ -1,7 +1,8 @@
-"""F11 예산 섹션: 세션 상세(session_detail) 슬롯 order 20.
+"""F11 예산 섹션: 세션 상세(session_detail) 슬롯 order 40(적합도 순위 35 아래).
 
 - 보증금 상한·월 고정비 상한(만원) 입력, 저장, 비우기.
-- "예산 안만 보기" 토글 → st.session_state[budget_filter_key(sid)]에 쓴다. 비교표(P3, order 30)가 읽는다.
+- "예산 안만 보기" 토글 → st.session_state[budget_filter_key(sid)]에 쓴다. 비교표(P3, order 30)·적합도 순위(F12, 35)가 읽는다.
+  이 섹션이 그 둘보다 아래에 그려지므로, 토글 값은 on_change 콜백에서 먼저 옮겨 둔다(콜백은 화면을 다시 그리기 전에 돈다).
 - 상한이 없으면 토글을 끄고 "예산을 먼저 입력하세요"를 보여 준다.
 - 토글이 켜져 있으면 숨긴 매물을 사유별로 세어 보여 주고(예산 초과 n건 · 판단 불가 n건 숨김),
   그 아래 판단 불가 매물마다 사유·다음 행동·[열기]를 한 줄씩 보여 준다(GET /sessions/{sid}/budget/evaluations).
@@ -88,8 +89,13 @@ def _render_toggle(sid: str, budget: dict) -> None:
         st.toggle("예산 안만 보기", value=False, disabled=True, key=f"budget_toggle_off:{sid}")
         st.caption("예산을 먼저 입력하세요. 상한을 저장하면 예산 안 매물만 골라 볼 수 있습니다.")
         return
-    on = st.toggle("예산 안만 보기", value=bool(st.session_state.get(key, False)), key=f"budget_toggle:{sid}",
-                   help="'판단 불가'(금액 미기재) 매물도 숨깁니다.")
+    toggle_key = f"budget_toggle:{sid}"
+
+    def _sync() -> None:   # 위쪽 비교표·순위가 같은 실행에서 바뀐 값을 읽도록
+        st.session_state[key] = bool(st.session_state.get(toggle_key))
+
+    on = st.toggle("예산 안만 보기", value=bool(st.session_state.get(key, False)), key=toggle_key,
+                   help="'판단 불가'(금액 미기재) 매물도 숨깁니다.", on_change=_sync)
     st.session_state[key] = on
     if on:
         st.caption("비교표에 예산 안 매물만 보여 줍니다. 숨긴 매물을 보려면 토글을 끄세요.")
@@ -138,4 +144,4 @@ def render_budget(ctx: dict) -> None:
         _render_toggle(sid, budget)
 
 
-SECTIONS = [{"slot": "session_detail", "order": 20, "render": render_budget}]
+SECTIONS = [{"slot": "session_detail", "order": 40, "render": render_budget}]

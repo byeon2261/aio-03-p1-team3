@@ -1,6 +1,6 @@
 """F12 항목 가중치화 섹션.
 
-- session_detail order 25: 항목 가중치 켜기/끄기, 이 세션에 쓸 프로필 고르기, 프로필 만들기·고치기·삭제
+- session_detail order 45(예산 40 아래): 항목 가중치 켜기/끄기, 이 세션에 쓸 프로필 고르기, 프로필 만들기·고치기·삭제
 - session_detail order 35: 적합도 순위(비교표 바로 아래). 예산 필터가 켜져 있으면 남은 후보끼리 순위
 - listing_detail order 45: 항목 만족도 입력(0~100, 비우면 미입력)
 - render_profile_manager(): 마이페이지(P4)의 '가중치 프로필' 탭이 부른다(프로필 목록·만들기·고치기·삭제)
@@ -94,7 +94,7 @@ def _forget_profiles() -> None:
     _bump(PROFILES_VER_KEY)
 
 
-# ------------------------------------------------------------------ 세션 설정 (order 25)
+# ------------------------------------------------------------------ 세션 설정 (order 45)
 def _save_setting(sid: str, enabled: bool, profile_id: str | None, done: str, widget_key: str) -> None:
     try:
         with st.spinner("저장하는 중…"):
@@ -334,7 +334,7 @@ def render_satisfaction(ctx: dict) -> None:
 
 
 SECTIONS = [
-    {"slot": "session_detail", "order": 25, "render": render_scoring_settings},
+    {"slot": "session_detail", "order": 45, "render": render_scoring_settings},
     {"slot": "session_detail", "order": 35, "render": render_ranking},
     {"slot": "listing_detail", "order": 45, "area": "score", "render": render_satisfaction},   # '내 점수' 탭
 ]
