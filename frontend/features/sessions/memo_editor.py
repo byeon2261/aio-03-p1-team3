@@ -3,6 +3,7 @@
 - 화면에 들어올 때 GET 초안으로 복원한다. 410이면 "초안이 만료되었습니다"를 보여 준다.
 - 입력이 바뀔 때(on_change: 다른 곳을 누르거나 Ctrl+Enter)와 "임시 저장" 버튼으로 PUT 초안.
 - "메모 저장"은 on_save(text)를 부르고, 성공하면 앱 전체를 다시 그린다.
+  validate()를 주면 저장 전에 부르고, 문구를 돌려주면 경고로 보여 주고 저장하지 않는다(새 메모의 매물 이름 확인).
 - 자동 저장 때 화면 전체가 다시 그려지지 않도록 st.fragment 안에서 그린다
   (fragment는 처음 그릴 때 만든다. import 시 st 함수를 부르지 않기 위해서다).
 """
@@ -86,7 +87,8 @@ def _autosave(scope: str, draft_path: str, force: bool = False) -> None:
 
 
 def _editor_body(*, scope: str, draft_path: str, initial_text: str, label: str, placeholder: str,
-                 save_label: str, on_save: Callable[[str], str], clear_after_save: bool) -> None:
+                 save_label: str, on_save: Callable[[str], str], clear_after_save: bool,
+                 validate: Callable[[], str | None] | None = None) -> None:
     text_key = _text_key(scope)
     if st.session_state.pop(_reset_key(scope), False):
         st.session_state[text_key] = ""
@@ -123,6 +125,10 @@ def _editor_body(*, scope: str, draft_path: str, initial_text: str, label: str, 
     if not clicked:
         return
 
+    problem = validate() if validate else None
+    if problem:
+        st.warning(problem)
+        return
     text = st.session_state.get(text_key, "")
     if not text.strip():
         st.warning("메모가 비어 있습니다. 내용을 적은 뒤 저장하세요.")
@@ -145,7 +151,8 @@ def _editor_body(*, scope: str, draft_path: str, initial_text: str, label: str, 
 
 def render_memo_editor(*, scope: str, draft_path: str, initial_text: str = "", label: str = "메모",
                        placeholder: str = "", save_label: str = "메모 저장",
-                       on_save: Callable[[str], str], clear_after_save: bool = False) -> None:
+                       on_save: Callable[[str], str], clear_after_save: bool = False,
+                       validate: Callable[[], str | None] | None = None) -> None:
     """메모 입력칸을 그린다. on_save(text)는 정식 저장을 하고 성공 문구를 돌려준다(ApiError는 여기서 보여 준다)."""
     global _fragment_fn
     message = st.session_state.pop(f"{_PREFIX}saved:{scope}", None)
@@ -156,4 +163,4 @@ def render_memo_editor(*, scope: str, draft_path: str, initial_text: str = "", l
         _fragment_fn = st.fragment(_editor_body)
     _fragment_fn(scope=scope, draft_path=draft_path, initial_text=initial_text, label=label,
                  placeholder=placeholder, save_label=save_label, on_save=on_save,
-                 clear_after_save=clear_after_save)
+                 clear_after_save=clear_after_save, validate=validate)

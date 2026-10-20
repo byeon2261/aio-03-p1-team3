@@ -10,7 +10,7 @@ from typing import Any
 
 from app.core.analysis_contract import needs_reanalysis
 from app.core.db import Database, UniqueViolation
-from app.core.repo import field_overrides, latest_analysis, list_listings
+from app.core.repo import field_overrides, latest_analysis, list_listings, listing_label
 from app.core.values import MONEY_FIELDS, effective_values
 from app.features.map.schemas import (
     ListingLocationOut, LocationIn, LocationOut, MyPinOut, MyPinsOut, SessionPinOut,
@@ -24,7 +24,7 @@ def _now() -> dt.datetime:
 
 
 def label_of(listing: dict) -> str:
-    return f"{int(listing['listing_no'])}번 집"
+    return listing_label(listing)
 
 
 def get_row(db: Database, listing_id: Any) -> dict | None:
