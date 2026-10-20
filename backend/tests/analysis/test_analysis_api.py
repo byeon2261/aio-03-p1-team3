@@ -45,7 +45,7 @@ def test_analysis_api_success_saves_row_and_log(client_as, make_user, make_listi
     assert rows[0]["ai_latency_ms"] == 150 and rows[0]["latency_ms"] is not None
     log = logs_for(memory_db, "/analyses")[-1]
     assert log["status_code"] == 200 and log["ai_latency_ms"] == 150
-    assert log["prompt_version"] == "v1" and log["cache_hit"] is False and log["error_code"] is None
+    assert log["prompt_version"] == "v2" and log["cache_hit"] is False and log["error_code"] is None
 
 
 def test_analysis_api_format_retry_then_success(client_as, make_user, make_listing, memory_db, use_fake_ai):
@@ -106,7 +106,7 @@ def test_analysis_api_contract_fake_pipeline_failure_maps_to_fmt(client_as, make
     assert get_pipeline() is fake
     r = _post(c, listing["id"])
     assert r.status_code == 502 and r.json()["error"]["code"] == "AI_FORMAT_ERROR"
-    assert fake.calls[0]["cache_scope"] == alice.auth_user_id and fake.calls[0]["prompt_version"] == "v1"
+    assert fake.calls[0]["cache_scope"] == alice.auth_user_id and fake.calls[0]["prompt_version"] == "v2"
     assert _rows(memory_db, listing["id"])[0]["error_code"] == "FMT"
     assert logs_for(memory_db, "/analyses")[-1]["error_code"] == "FMT"
 
