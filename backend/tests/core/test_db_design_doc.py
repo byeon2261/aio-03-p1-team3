@@ -4,6 +4,7 @@
 2) 3절 물리 ERD: 테이블마다 컬럼 이름·순서 = 마이그레이션, 관계선 수 = `references` 수
 3) 2절 논리 ERD: 엔티티 속성 = 물리 테이블에서 FK 컬럼(`*_id`, request_id 제외)을 뺀 컬럼
 4) 마이그레이션의 인덱스·이름 있는 제약이 문서에 모두 나온다
+5) 모든 테이블·컬럼에 DB 코멘트(COMMENT ON)가 있다(Issue #6, 0011)
 
 DB를 바꾸는 PR(테이블·컬럼·인덱스·FK 추가나 삭제)은 이 문서도 함께 고쳐야 통과한다.
 마이그레이션에서 나중에 지운 테이블(`drop table if exists`)은 비교에서 뺀다.
@@ -124,3 +125,20 @@ def test_indexes_and_named_constraints_documented():
     names += re.findall(r"add constraint (\w+)()", sql) + re.findall(r"constraint (\w+) (?:check|unique)()", sql)
     missing = sorted({n for n, t in names if t not in dropped and f"`{n}`" not in doc})
     assert not missing, f"{DOC_NAME}에 마이그레이션의 인덱스·제약 이름이 없습니다: {missing}"
+
+
+COMMENT_TABLE = re.compile(r"comment on table public\.(\w+) is")
+COMMENT_COLUMN = re.compile(r"comment on column public\.(\w+)\.(\w+) is")
+
+
+def test_every_table_and_column_has_db_comment():
+    """과제 기준 '모든 컬럼의 코멘트': 설계서뿐 아니라 실제 DB에도 COMMENT ON이 있어야 한다(Issue #6, 0011)."""
+    sql = _sql()
+    tables = _tables(sql)
+    commented_tables = set(COMMENT_TABLE.findall(sql))
+    commented_cols = set(COMMENT_COLUMN.findall(sql))
+    missing_tables = sorted(set(tables) - commented_tables)
+    missing_cols = sorted(f"{t}.{c}" for t, cols in tables.items() for c in cols if (t, c) not in commented_cols)
+    assert not missing_tables, f"테이블 코멘트가 없습니다: {missing_tables}. 새 마이그레이션에 COMMENT ON TABLE을 넣으세요."
+    assert not missing_cols, (f"컬럼 코멘트가 없습니다: {missing_cols}. {DOC_NAME} 5절과 같은 문장으로 "
+                              "새 마이그레이션에 COMMENT ON COLUMN을 넣으세요.")

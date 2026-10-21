@@ -1,7 +1,7 @@
 # 데이터베이스 설계서 (DB_DESIGN)
 
 집 보기 메모 비교 서비스의 데이터베이스 설계서입니다. 실제 마이그레이션(`supabase/migrations/*.sql`)과 서버 코드(`backend/app/`)를 읽고 그 내용대로 썼습니다.
-기준: `main` 2026-10-19 (PR #34까지 병합 뒤, 마이그레이션 `0001`~`0141`). DB를 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
+기준: `main` 2026-10-21 (PR #54까지 병합 뒤, 마이그레이션 `0001`~`0141`과 이 문서와 함께 더한 `0011_comments.sql`). DB를 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
 
 - DBMS: PostgreSQL (Supabase). 모든 테이블은 `public` 스키마에 있고, 로그인 계정은 Supabase가 관리하는 `auth.users`를 씁니다.
 - 접근 경로: 서버(FastAPI)가 **사용자 토큰**(`authenticated` 역할, RLS 적용)과 **secret key**(`service_role`, 운영·관리 작업)로 접근합니다. 화면(Streamlit)은 DB에 직접 붙지 않습니다.
@@ -28,7 +28,7 @@
 
 | 영역 | 테이블 | 기능 | 마이그레이션 |
 |---|---|---|---|
-| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql`, `0009_listing_name.sql`, `0010_listing_name_update.sql` |
+| 사용자 데이터(소유 사슬) | `profiles`, `tour_sessions`, `listings`, `analyses`, `feedback` | F1 인증, F2 세션·매물, F4·F5 AI 분석, F7 수정·피드백 | `0001_core.sql`, `0008_feedback_action.sql`, `0009_listing_name.sql`(매물 이름), `0010_listing_name_update.sql`(이름 수정 권한) |
 | 사진 | `photos` | F10 매물 사진 | `0006_photos.sql` |
 | 예산 | `session_budgets` | F11 세션 예산 | `0007_budget.sql` |
 | 항목 가중치 | `weight_profiles`, `weight_items`, `listing_satisfactions`, `session_scoring` | F12 적합도 점수 | `0120_scoring.sql` |
@@ -36,11 +36,11 @@
 | 발품 후기 | `community_posts`, `community_post_photos`, `community_post_likes` | F14 커뮤니티 후기·좋아요 | `0140_community.sql`, `0141_community_likes.sql` |
 | 운영(관리자 전용) | `request_logs`, `eval_cases`, `eval_runs`, `eval_results` | F8 실시간 로그, F9 개선 전후 평가 | `0002_ops.sql` |
 
-권한·RLS는 `0003_rls.sql`과 각 기능 파일 끝에 있습니다. `0004`·`0005`는 예약 번호(파일 없음)이고, `0130_map_listings.sql`(서울역 더미 매물)은 저장소에서 빠졌으며 `0132_drop_map_listings.sql`이 이미 만든 테이블을 지웁니다. 따라서 최종 스키마의 `public` 테이블은 **19개**입니다(외부 `auth.users` 제외).
+권한·RLS는 `0003_rls.sql`과 각 기능 파일 끝에 있습니다. `0004`·`0005`는 예약 번호(파일 없음)이고, `0130_map_listings.sql`(서울역 더미 매물)은 저장소에서 빠졌으며 `0132_drop_map_listings.sql`이 이미 만든 테이블을 지웁니다. 따라서 최종 스키마의 `public` 테이블은 **19개**입니다(외부 `auth.users` 제외). `0011_comments.sql`은 테이블을 만들지 않고, 코멘트가 없던 테이블 11개에 테이블·컬럼 코멘트만 더합니다(5절).
 
 ### 1.2 실행 순서
 
-`0001` → `0002` → `0003` → `0006` → `0007` → `0008` → `0120` → `0131` → `0132` → `0140` → `0141`. 모든 파일은 `if not exists`·`drop … if exists`로 써서 여러 번 실행해도 안전합니다. 배포 DB에는 **서버를 배포하기 전에** 실행합니다(`docs/DEPLOY.md` 2단계).
+`0001` → `0002` → `0003` → `0006` → `0007` → `0008` → `0009` → `0010` → `0011` → `0120` → `0131` → `0132` → `0140` → `0141`. 이미 배포한 DB는 아직 실행하지 않은 파일만 번호 순서대로 실행합니다(`0009`·`0010`·`0011`은 `0141` 뒤에 만들었으므로, `0141`까지 실행한 DB는 이 셋만 실행하면 됩니다). 모든 파일은 `if not exists`·`drop … if exists`로 써서 여러 번 실행해도 안전합니다. 배포 DB에는 **서버를 배포하기 전에** 실행합니다(`docs/DEPLOY.md` 2단계).
 
 ### 1.3 공통 설계 규칙
 
@@ -586,7 +586,7 @@ erDiagram
 
 ## 5. 테이블 명세
 
-칸 설명: **길이·범위**는 문자열 길이나 숫자 범위와 그 규칙을 막는 곳([DB]/[API]), **키·제약**은 PK·FK·UK·CHECK·인덱스입니다. **코멘트**는 컬럼의 뜻입니다. `0008`·`0120`·`0131`·`0140`의 코멘트는 이미 DB에 `COMMENT ON`으로 들어가 있고, 나머지(`0001`·`0002`·`0006`·`0007`)는 이 문서의 코멘트를 Issue #6(`0009_comments.sql`)으로 DB에 반영할 예정입니다.
+칸 설명: **길이·범위**는 문자열 길이나 숫자 범위와 그 규칙을 막는 곳([DB]/[API]), **키·제약**은 PK·FK·UK·CHECK·인덱스입니다. **코멘트**는 컬럼의 뜻이고, 모든 테이블·컬럼에 같은 문장이 DB `COMMENT ON`으로 들어가 있습니다. F12·F13·F14 테이블과 `feedback.action`(0008)·`listings.name`(0009)은 각 기능 마이그레이션이, 나머지 `0001`·`0002`·`0006`·`0007` 테이블 11개는 `0011_comments.sql`(Issue #6)이 넣습니다. 이 절의 코멘트를 고치면 새 마이그레이션으로 DB 코멘트도 함께 고칩니다.
 
 ### 5.1 `profiles` — 사용자
 
@@ -687,7 +687,7 @@ erDiagram
 | `monthly_max_manwon` | integer | 0 이상 | NULL | — | CHECK `is null or >= 0` | 월 비용(월세+관리비) 상한(만원). null이면 제한 없음 |
 | `updated_at` | timestamptz | — | NOT NULL | `now()` | — | 마지막으로 고친 시각(UTC) |
 
-### 5.8 `weight_profiles` — 가중치 프로필 (DB 코멘트 있음)
+### 5.8 `weight_profiles` — 가중치 프로필
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -697,7 +697,7 @@ erDiagram
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 만든 시각(UTC) |
 | `updated_at` | timestamptz | — | NOT NULL | `now()` | — | 마지막으로 이름·가중치를 고친 시각(UTC) |
 
-### 5.9 `weight_items` — 프로필의 항목별 가중치 (DB 코멘트 있음)
+### 5.9 `weight_items` — 프로필의 항목별 가중치
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -705,7 +705,7 @@ erDiagram
 | `item_key` | text | 1~30자, 서버 `SCORE_ITEMS` 중 하나 [API] | NOT NULL | — | PK(2), CHECK `char_length(item_key) between 1 and 30` | 평가 항목 이름(예: 채광) |
 | `weight` | smallint | 0~100 | NOT NULL | — | CHECK `weight between 0 and 100` | 중요도 0~100 정수. 합이 100이 아니어도 계산에서 비율로 맞춘다 |
 
-### 5.10 `listing_satisfactions` — 매물의 항목별 만족도 (DB 코멘트 있음)
+### 5.10 `listing_satisfactions` — 매물의 항목별 만족도
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -714,7 +714,7 @@ erDiagram
 | `satisfaction` | smallint | 0~100 | NOT NULL | — | CHECK `satisfaction between 0 and 100` | 만족도 0~100 정수, 높을수록 좋음(측정값 아님) |
 | `updated_at` | timestamptz | — | NOT NULL | `now()` | — | 저장한 시각(UTC) |
 
-### 5.11 `session_scoring` — 세션의 가중치 설정 (DB 코멘트 있음)
+### 5.11 `session_scoring` — 세션의 가중치 설정
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -723,7 +723,7 @@ erDiagram
 | `weight_profile_id` | uuid | — | NULL | — | FK → `weight_profiles.id` (SET NULL), IDX `session_scoring_weight_profile_id_idx` | 고른 프로필. null이면 모든 항목 동일 가중치. 프로필 삭제 시 null |
 | `updated_at` | timestamptz | — | NOT NULL | `now()` | — | 마지막으로 설정을 바꾼 시각(UTC) |
 
-### 5.12 `listing_locations` — 매물 위치 (DB 코멘트 있음)
+### 5.12 `listing_locations` — 매물 위치
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -738,7 +738,7 @@ erDiagram
 
 `listing_locations_has_address`: `road_address is not null or parcel_address is not null`.
 
-### 5.13 `community_posts` — 발품 후기 (DB 코멘트 있음)
+### 5.13 `community_posts` — 발품 후기
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -754,7 +754,7 @@ erDiagram
 | `created_at` | timestamptz | — | NOT NULL | `now()` | IDX `community_posts_created_at_idx`(desc) | 작성 시각(UTC, 서버 기록) |
 | `updated_at` | timestamptz | — | NOT NULL | `now()` | — | 마지막 수정 시각(UTC) |
 
-### 5.14 `community_post_photos` — 후기 사진 (DB 코멘트 있음)
+### 5.14 `community_post_photos` — 후기 사진
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -766,7 +766,7 @@ erDiagram
 | `size_bytes` | integer | 1~5,242,880 | NOT NULL | — | CHECK `size_bytes between 1 and 5242880` | 파일 크기(1바이트~5MB) |
 | `created_at` | timestamptz | — | NOT NULL | `now()` | — | 올린 시각(UTC) |
 
-### 5.15 `community_post_likes` — 후기 좋아요 (DB 코멘트 있음)
+### 5.15 `community_post_likes` — 후기 좋아요
 
 | 컬럼 | 타입 | 길이·범위 | NULL | 기본값 | 키·제약 | 코멘트 |
 |---|---|---|---|---|---|---|
@@ -879,11 +879,12 @@ erDiagram
 | 길이(`btrim` 기준, F12·F13·F14 문자열) | 공백만 있는 이름·제목을 막고, 화면에 넘치는 긴 값을 막는다 |
 | 좌표 범위(위도 33~39, 경도 124~132)·우편번호 5자리 | 한국 밖 좌표나 잘못 변환된 값을 거른다 |
 | `listing_locations_has_address` | 도로명·지번 중 하나는 있어야 주소를 보여 줄 수 있다 |
+| `listings_name_len` (`name is null or char_length(btrim(name)) between 1 and 30`) | 매물 이름은 비교표·순위·지도 칸에 그대로 보이므로 공백만 있는 이름과 칸을 넘치는 긴 이름을 막는다. 이름이 없던 예전 매물(0009 이전)을 위해 null은 허용한다 |
 | `community_posts.floor` (-10~200, 0 제외) | 층에 0층은 없고, 지하는 음수로 통일한다 |
 
 `item_key`에는 항목 목록 CHECK를 걸지 않았습니다. 항목 목록(`SCORE_ITEMS`)을 바꿀 때 마이그레이션 없이 동작하게 하려는 결정이고, 서버가 저장 전에 목록을 확인합니다.
 
-`tour_sessions.title`, `listings.memo_text`, `feedback.comment`, `profiles.nickname`의 길이는 DB CHECK 없이 서버(Pydantic)만 막습니다(0001 당시 결정). Issue #6에서 CHECK를 더할지 정합니다.
+`tour_sessions.title`, `listings.memo_text`, `feedback.comment`, `profiles.nickname`의 길이는 DB CHECK 없이 서버(Pydantic)만 막습니다(0001 당시 결정). 이 값들은 사용자 토큰으로도 서버 API를 거쳐서만 쓰입니다.
 
 ### 6.4 외래키 ON DELETE
 
@@ -983,7 +984,7 @@ PostgreSQL은 PK·UNIQUE에 인덱스를 자동으로 만들지만, FK에는 만
 |---|---|---|
 | `profiles` | SELECT | 본인 행(`auth_user_id = auth.uid()`) |
 | `tour_sessions` | SELECT·INSERT·DELETE, UPDATE(`title`, `visit_date`)만 | `profile_id = current_profile_id()` |
-| `listings` | SELECT·INSERT·DELETE, UPDATE(`memo_text`)만 | 세션 소유자 |
+| `listings` | SELECT·INSERT·DELETE, UPDATE(`memo_text`, `name`)만 (`name`은 0010) | 세션 소유자 |
 | `analyses` | SELECT·INSERT·DELETE (UPDATE 없음) | 매물 → 세션 소유자 |
 | `feedback` | SELECT·INSERT·DELETE (UPDATE 없음) | 본인 작성 + 분석이 본인 소유 |
 | `photos` | SELECT·INSERT·DELETE | 본인 업로드 + 매물이 본인 소유 |
@@ -1024,5 +1025,5 @@ PostgreSQL은 PK·UNIQUE에 인덱스를 자동으로 만들지만, FK에는 만
 
 - 새 마이그레이션을 더하는 PR은 이 문서의 1.1·1.2절, ERD(2·3절), 테이블 명세(5절), 제약 이유(6절)를 같은 PR에서 고칩니다.
 - 기존 마이그레이션 파일은 고치지 않고 새 번호 파일로 바꿉니다(`CLAUDE.md` 3절). 이 문서는 모든 마이그레이션을 실행한 **최종 상태**를 적습니다.
-- 컬럼 코멘트: `0008`·`0120`·`0131`·`0140`·`0141`은 DB에 이미 있습니다. 나머지 테이블의 코멘트는 이 문서의 5절을 기준으로 Issue #6(`0009_comments.sql`)에서 `COMMENT ON`으로 반영합니다.
+- 컬럼 코멘트: 모든 테이블의 코멘트가 DB에 있습니다(`0008`·`0009`·`0011`·`0120`·`0131`·`0140`·`0141`). 컬럼을 더하거나 코멘트를 바꾸는 PR은 이 문서 5절과 같은 문장으로 `COMMENT ON`을 같은 마이그레이션에 넣습니다.
 - 테이블별 쓰기 담당과 API는 `docs/CONTRACT.md` 5절, 화면 흐름은 `docs/SCREEN_DESIGN.md`, 엔드포인트는 `docs/API_DESIGN.md`를 봅니다.

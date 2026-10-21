@@ -1,7 +1,7 @@
 # PROJECT_CONTEXT — 과제 배경과 현재 상태
 
 이 저장소에서 작업하는 Claude와 팀원이 같은 배경을 알고 시작하기 위한 문서입니다.
-상황이 바뀌면(작업 완료, 일정·범위 변경) 이 파일을 PR로 고쳐 최신 상태로 유지합니다. 마지막 갱신: 2026-10-20.
+상황이 바뀌면(작업 완료, 일정·범위 변경) 이 파일을 PR로 고쳐 최신 상태로 유지합니다. 마지막 갱신: 2026-10-21.
 
 ## 1. 과제 개요
 
@@ -74,7 +74,7 @@
   - v2(10-15)·v2(10-20): 95.6%·75.0%(NUM 2·CHK 5), 95.0%·80.0%(NUM 3·CHK 4)
   - 이때의 v2.md는 v1 복사본이었다(주석만 다름). 따라서 두 v2 실행의 차이는 프롬프트 효과가 아니라 **같은 프롬프트를 다시 돌릴 때의 편차**(필드 정확도 ±0.6%p, 빠진 항목 정확도 ±5%p)다. 개선 효과는 이 편차보다 커야 개선으로 본다.
 - v2 프롬프트 실제 수정(2026-10-20): 👎 사례와 v1 실패 사례(NUM: conflict_01·money_03·vague_01, CHK: mixed_01·money_03·neg_02·nofee_01)를 근거로 정정 값·슬래시 표기·한글 숫자·근사치·단점 정리·체크 항목 근거 규칙을 더했다(변경 기록은 `v2.md` 맨 위 주석). 서비스 기본 버전(`ACTIVE_PROMPT_VERSION`)도 v2로 바꿨다. 수정 후 v2 평가 재실행 결과는 `docs/IMPROVEMENT.md`(#8)에 기록한다.
-- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/SCREEN_DESIGN.md`(화면 설계서, #4. F12·F13·F14 포함), `docs/DB_DESIGN.md`(DB 설계서, #5. 테이블 18개, 논리·물리 ERD·컬럼 명세는 `backend/tests/core/test_db_design_doc.py`가 마이그레이션과 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
+- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/SCREEN_DESIGN.md`(화면 설계서, #4. F12·F13·F14 포함), `docs/DB_DESIGN.md`(DB 설계서, #5. 테이블 19개, 모든 컬럼 코멘트는 DB에도 있음, 논리·물리 ERD·컬럼 명세는 `backend/tests/core/test_db_design_doc.py`가 마이그레이션과 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
 
 ### 아직 없는 것
 
@@ -98,7 +98,7 @@ UI 디자인 개선은 10/19 팀 회의에서 보류를 풀고 진행하기로 �
 | 1 | API 설계 문서 | `docs/API_DESIGN.md` | 1절 API 요구사항 전부, 실제 코드(`backend/app/features/*/router.py`, `core/schemas.py`, `core/errors.py`)와 일치 | 10/20 · 완료(#3) |
 | 2 | 화면 설계서 | `docs/SCREEN_DESIGN.md` | 1절 화면 요구사항 전부, 실제 화면(`frontend/`)과 일치 | 10/20 · 완료(#4) |
 | 3 | DB 설계서 | `docs/DB_DESIGN.md` | 1절 DB 요구사항 전부, `supabase/migrations/*`와 일치 | 10/20 · 완료(#5) |
-| 3+ | (선택) DB 컬럼 코멘트 마이그레이션 | `supabase/migrations/0009_comments.sql` | 실제 DB에 코멘트 반영 | 10/20 |
+| 3+ | (선택) DB 컬럼 코멘트 마이그레이션 | `supabase/migrations/0011_comments.sql`(0009·0010은 매물 이름이 먼저 씀) | 실제 DB에 코멘트 반영 | 10/21 · 완료(#6) |
 | 4 | 사용자 피드백 수집 | 서비스 안의 평가 기록 | 팀원·수강생 평가가 답변에 연결돼 저장 | 10/20 |
 | 5 | 개선 전후 기록 | `docs/IMPROVEMENT.md` | 피드백 사례 → v1→v2 변경 내용 → 비교 결과 → 남은 한계 | 10/21 |
 | 6 | 배포 환경 최종 검증 | 검증 기록 | 배포 서버 스모크 테스트, 의도한 오류 요청의 로그 확인, 일반 계정의 운영 화면 차단, 재시작 후 기록 유지 | 10/21 |
