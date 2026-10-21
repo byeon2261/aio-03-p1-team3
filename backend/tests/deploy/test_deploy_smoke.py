@@ -58,6 +58,7 @@ class FakeApi:
         self.analysis_request_ids: list[str] = []
         self.sessions: dict[str, dict] = {}
         self.listings: dict[str, dict] = {}
+        self.listing_names: list[str] = []
         self.analyses: dict[str, dict] = {}
         self.overrides: dict[str, dict] = {}
         self.ratings: dict[str, str] = {}
@@ -129,6 +130,10 @@ class FakeApi:
             self.deleted.append(parts[1])
             return self._json(200, {"ok": True})
         if method == "POST" and parts[0] == "sessions" and parts[2] == "listings":
+            name = str(body.get("name") or "").strip()
+            if not 1 <= len(name) <= 30:   # 실제 서버와 같이 매물 이름은 필수(1~30자, #46)
+                return self._error(422, "VALIDATION_ERROR", "매물 이름을 입력하세요.")
+            self.listing_names.append(name)
             no = sum(1 for l in self.listings.values() if l["session_id"] == parts[1]) + 1
             lid = str(uuid.uuid4())
             self.listings[lid] = {"id": lid, "session_id": parts[1], "listing_no": no, "label": f"{no}번 집",
@@ -216,6 +221,16 @@ def test_deploy_full_flow_passes_and_cleans_up():
     assert lines[-1].startswith("== 결과: 통과 12")
     # 각 줄에 상태와 걸린 시간이 찍힌다
     assert any(l.startswith("[PASS]  6. 메모 분석 2건 (") and "s)" in l for l in lines)
+
+
+def test_deploy_listings_are_created_with_names():
+    """매물 이름은 필수(#46). 이름 없이 만들면 실제 서버처럼 422로 막힌다."""
+    api = FakeApi()
+    runner, lines = make_runner(api)
+    assert runner.run() == 0, lines
+    assert api.listing_names == list(smoke.SAMPLE_LISTING_NAMES)
+    assert len(smoke.SAMPLE_LISTING_NAMES) == len(smoke.SAMPLE_MEMOS)
+    assert all(1 <= len(n) <= 30 for n in smoke.SAMPLE_LISTING_NAMES)
 
 
 def test_deploy_output_has_no_secrets_or_memo_text():
