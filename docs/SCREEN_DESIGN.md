@@ -1,7 +1,7 @@
 # 화면 설계서 (SCREEN_DESIGN)
 
 집 보기 메모 비교 서비스의 화면 설계서입니다. 실제 화면 코드(`frontend/`)를 읽고 그 내용대로 썼습니다.
-기준: `main` 2026-10-19 (PR #34까지 병합 뒤) + 2026-10-20 공통 테마·사이드바·세션 목록/상세·매물 상세 화면 개편(`feat/ui-theme`). 화면을 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
+기준: `main` 2026-10-21 (PR #55까지 병합 뒤: 공통 테마·사이드바 개편, 새 매물 메모 모달·매물 이름·연필 수정 모달, 발품 후기 상세 페이지, 세션 만들기 예산, 섹션 순서 비교표 → 가중치 → 순위 → 예산 포함). 화면을 바꾸는 PR은 이 문서도 같은 PR에서 고칩니다(`CLAUDE.md` 3절).
 
 - 화면 기술: Streamlit 1.65 (`frontend/app.py` 진입점, `layout="wide"`).
 - 서버 호출: 모든 화면은 `frontend/core/api.py`로 FastAPI 서버를 부릅니다. 엔드포인트의 요청·응답 형식은 API 설계 문서(`docs/API_DESIGN.md`)와 `docs/CONTRACT.md`를 봅니다.
@@ -734,3 +734,4 @@ flowchart TD
   - 새 오류 코드: `core/ui.py` `ERROR_MESSAGES`와 5.4절 표.
 - 문서와 화면이 다르면 화면 코드를 기준으로 문서를 고치고, 그 차이를 PR 설명에 적습니다(`CLAUDE.md` 7절).
 - 엔드포인트의 요청·응답 필드는 이 문서에 다시 적지 않고 API 설계 문서를 봅니다.
+- 자동 확인: `backend/tests/core/test_screen_design_doc.py`가 1절 화면 목록(페이지 order·제목), 1절 섹션 표(S2·S3 order), 5.4절 오류 코드를 화면 코드(`PAGES`·`SECTIONS`·`core/ui.py`)와 비교합니다. 페이지·섹션·오류 문구를 바꾼 PR이 이 문서를 고치지 않으면 `check_merge`에서 실패합니다. 와이어프레임·문구·액션 표는 직접 고칩니다.

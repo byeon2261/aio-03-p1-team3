@@ -2,8 +2,9 @@
 
 1) 4절 '엔드포인트 전체 목록' 표의 (메서드, 경로) = 앱의 OpenAPI (메서드, 경로)
 2) 7.2절 '오류 코드 전체' 표 = 코드에서 내는 오류 코드와 HTTP 상태
+3) 6절 '데이터 모델' 표마다 필드 이름·순서와 필수/선택 = 앱의 OpenAPI 스키마(Pydantic 모델)
 
-API를 바꾸는 PR(엔드포인트 추가·삭제·경로 변경, 새 오류 코드)은 이 문서도 함께 고쳐야 통과한다.
+API를 바꾸는 PR(엔드포인트 추가·삭제·경로 변경, 새 오류 코드, 모델 필드 추가·삭제·필수 여부 변경)은 이 문서도 함께 고쳐야 통과한다.
 실패 메시지에 고칠 위치와 항목이 나온다.
 
 오류 코드는 소스에서 `<상태>, "<코드>"`(AppError(404, "X", …), (502, "X", …)), `<상태>: "<코드>"`
@@ -137,3 +138,34 @@ def test_doc_lists_every_error_code_in_code():
             f"{DOC_NAME} 7.2절 표에 코드에서 내지 않는 오류 코드가 있습니다. 행을 지우거나 이름을 코드와 같게 고치세요:\n"
             + "\n".join(f"  - {c}" for c in extra))
     assert not problems, "\n\n".join(problems)
+
+
+MODEL_HEAD = re.compile(r"^#### (\w+)", re.MULTILINE)
+FIELD_ROW = re.compile(r"^\| `(\w+)` \| (?:[^|\\]|\\\|)+ \| (필수|선택) \|", re.MULTILINE)   # 타입 칸의 `\|`(예: string \| null) 허용
+
+
+def test_doc_models_match_pydantic_models():
+    """6절의 모델 표마다 필드 이름·순서·필수 여부가 실제 Pydantic 모델(OpenAPI 스키마)과 같은지."""
+    from app.main import create_app
+
+    schemas = create_app().openapi()["components"]["schemas"]
+    section = _doc_text().split("## 6. 데이터 모델", 1)[1].split("\n## 7.", 1)[0]
+    parts = re.split(r"\n(?=#### )", section)[1:]
+    assert parts, f"{DOC_NAME} 6절에서 '#### 모델이름' 표를 찾지 못했습니다."
+    problems = []
+    for part in parts:
+        name = MODEL_HEAD.match(part).group(1)
+        if name not in schemas:
+            problems.append(f"{name}: 코드에 없는 모델입니다(이름을 바꿨거나 지웠다면 6절도 고치세요)")
+            continue
+        rows = FIELD_ROW.findall(part)
+        code_fields = list(schemas[name].get("properties", {}))
+        required = set(schemas[name].get("required", []))
+        if [f for f, _ in rows] != code_fields:
+            problems.append(f"{name}: 문서 필드 {[f for f, _ in rows]} ≠ 코드 필드 {code_fields}")
+            continue
+        wrong = [f"{f}(문서 {need}, 코드 {'필수' if f in required else '선택'})"
+                 for f, need in rows if (need == "필수") != (f in required)]
+        if wrong:
+            problems.append(f"{name}: 필수/선택이 다릅니다 {wrong}")
+    assert not problems, f"{DOC_NAME} 6절 모델 표가 코드와 다릅니다:\n- " + "\n- ".join(problems)
