@@ -1,6 +1,6 @@
 """F4 분석 파이프라인 (AnalysisPipeline 구현). P7 평가도 get_pipeline()으로 이것을 쓴다.
 
-흐름: 캐시 확인 → Gemini 호출 → AnalysisAIOutput 검증 → 실패 시 1회 재시도 → F5 후처리(AnalysisResult) → AnalysisOutcome
+흐름: 캐시 확인 → Gemini 호출 → AnalysisAIOutput 검증 → 실패 시 1회 재시도 → F5 후처리(AnalysisResult, v3 이상은 v3 규칙도) → AnalysisOutcome
 
 - 캐시: use_cache이고 cache_scope가 있을 때만. 키 analysis:{cache_scope}:{memo_hash}:{prompt_version}:{model}:{thinking_level}.
   성공 결과(raw_output 포함)를 CACHE_TTL_SEC 동안 저장. KV가 없거나 장애면 캐시 없이 동작한다.
@@ -149,7 +149,7 @@ class GeminiAnalysisPipeline:
                 logger.info("analysis format error attempt=%d", attempt)
                 user_input = build_retry_input(first_input, exc.summary)
                 continue
-            result = postprocess(ai, memo_text)
+            result = postprocess(ai, memo_text, prompt_version)
             outcome = self._outcome(prompt_version, result=result, raw_output=joined_raw(),
                                     ai_latency_ms=ai_latency, status="success")
             if key:

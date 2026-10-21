@@ -13,7 +13,7 @@ from core.ui import fmt_kst, fmt_manwon, to_kst
 # 서버(runner.STALE_RUNNING_MINUTES)와 같은 값. 이보다 오래 'running'이면 멈춘 실행으로 본다
 STALE_MINUTES = 30
 
-PROMPT_VERSIONS = ("v1", "v2")
+PROMPT_VERSIONS = ("v1", "v2", "v3")
 
 # (key, 이름, 높을수록 좋은가)
 METRICS = (
@@ -250,9 +250,16 @@ def case_title(item: dict) -> str:
 
 
 def default_pair(done_runs: list[dict]) -> tuple[int, int]:
-    """기본 선택(목록은 최신순): 개선 전 = 가장 최근 v1, 개선 후 = 가장 최근 v2. 없으면 최근 두 개."""
+    """기본 선택(목록은 최신순): 개선 전 = 가장 최근 v1, 개선 후 = v1이 아닌 가장 높은 버전(v3 > v2)의 가장 최근 실행.
+    없으면 최근 두 개."""
     idx_v1 = next((i for i, r in enumerate(done_runs) if r.get("prompt_version") == "v1"), None)
-    idx_v2 = next((i for i, r in enumerate(done_runs) if r.get("prompt_version") == "v2"), None)
-    if idx_v1 is not None and idx_v2 is not None:
-        return idx_v1, idx_v2
+    idx_after = None
+    for version in reversed(PROMPT_VERSIONS):
+        if version == "v1":
+            break
+        idx_after = next((i for i, r in enumerate(done_runs) if r.get("prompt_version") == version), None)
+        if idx_after is not None:
+            break
+    if idx_v1 is not None and idx_after is not None:
+        return idx_v1, idx_after
     return (1, 0) if len(done_runs) >= 2 else (0, 0)

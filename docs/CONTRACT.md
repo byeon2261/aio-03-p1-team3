@@ -49,7 +49,7 @@ R이 만든 파일(`backend/app/core/*`, `backend/app/main.py`, `backend/tests/c
 - `AnalysisPipeline.run(memo_text, prompt_version, *, use_cache=True, cache_scope=None)` (async). cache_scope=None이면 캐시 읽기·쓰기 안 함. 등록 없으면 `get_pipeline()` 503 CONFIG_MISSING. 실패는 예외가 아니라 `AnalysisOutcome(status="failed", error_code=…)`로 돌려준다. API 키가 없거나 Gemini가 401·403이면 503 CONFIG_MISSING 예외(P2).
 - 형식 실패 표기: `AnalysisOutcome.error_code`는 `AI_FORMAT_ERROR`(`FMT`도 같은 뜻으로 받는다) → HTTP 응답 502 `AI_FORMAT_ERROR`, `analyses.error_code`·`request_logs.error_code`는 `FMT`, `eval_results.status`는 `AI_FORMAT_ERROR`·`failure_codes`는 `FMT`. 실패 여부는 코드가 아니라 `status`로 판단한다.
 
-설정 키: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, REDIS_URL, GEMINI_API_KEY, GEMINI_MODEL=gemini-3.5-flash-lite, GEMINI_THINKING_LEVEL=minimal, GEMINI_TIMEOUT_SEC=30, GEMINI_MIN_INTERVAL_SEC=4, ACTIVE_PROMPT_VERSION=v2, SIGNED_URL_TTL_SEC=600, MAX_PHOTO_MB=10, DRAFT_TTL_SEC=86400, CACHE_TTL_SEC=604800.
+설정 키: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, REDIS_URL, GEMINI_API_KEY, GEMINI_MODEL=gemini-3.5-flash-lite, GEMINI_THINKING_LEVEL=minimal, GEMINI_TIMEOUT_SEC=30, GEMINI_MIN_INTERVAL_SEC=4, ACTIVE_PROMPT_VERSION=v3, SIGNED_URL_TTL_SEC=600, MAX_PHOTO_MB=10, DRAFT_TTL_SEC=86400, CACHE_TTL_SEC=604800.
 
 ## 3. 모델 (backend/app/core/schemas.py)
 교차 모델
