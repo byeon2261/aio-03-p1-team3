@@ -74,7 +74,7 @@
   - v2(10-15)·v2(10-20): 95.6%·75.0%(NUM 2·CHK 5), 95.0%·80.0%(NUM 3·CHK 4)
   - 이때의 v2.md는 v1 복사본이었다(주석만 다름). 따라서 두 v2 실행의 차이는 프롬프트 효과가 아니라 **같은 프롬프트를 다시 돌릴 때의 편차**(필드 정확도 ±0.6%p, 빠진 항목 정확도 ±5%p)다. 개선 효과는 이 편차보다 커야 개선으로 본다.
 - v2 프롬프트 실제 수정(2026-10-20): 👎 사례와 v1 실패 사례(NUM: conflict_01·money_03·vague_01, CHK: mixed_01·money_03·neg_02·nofee_01)를 근거로 정정 값·슬래시 표기·한글 숫자·근사치·단점 정리·체크 항목 근거 규칙을 더했다(변경 기록은 `v2.md` 맨 위 주석). 서비스 기본 버전(`ACTIVE_PROMPT_VERSION`)도 v2로 바꿨다. 수정 후 v2 평가 재실행 결과는 `docs/IMPROVEMENT.md`(#8)에 기록한다.
-- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 67개·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/SCREEN_DESIGN.md`(화면 설계서, #4. F12·F13·F14 포함), `docs/DB_DESIGN.md`(DB 설계서, #5. 테이블 19개, 모든 컬럼 코멘트는 DB에도 있음, 논리·물리 ERD·컬럼 명세는 `backend/tests/core/test_db_design_doc.py`가 마이그레이션과 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
+- 문서: `docs/API_DESIGN.md`(API 설계 문서, #3. 엔드포인트 69개·모델 표·오류 코드 표는 `backend/tests/core/test_api_design_doc.py`가 코드와 비교), `docs/SCREEN_DESIGN.md`(화면 설계서, #4. F12·F13·F14 포함, 화면 목록·섹션 순서·오류 문구는 `backend/tests/core/test_screen_design_doc.py`가 코드와 비교), `docs/DB_DESIGN.md`(DB 설계서, #5. 테이블 19개, 모든 컬럼 코멘트는 DB에도 있음, 논리·물리 ERD·컬럼 명세는 `backend/tests/core/test_db_design_doc.py`가 마이그레이션과 비교), `docs/CONTRACT.md`(개발 계약), `OWNERS.md`, `DEPLOY.md`, `DEMO_CHECKLIST.md`, `METRICS.md`, `EXTENSION.md`, `USABILITY_EVAL.md`.
 
 ### 아직 없는 것
 
