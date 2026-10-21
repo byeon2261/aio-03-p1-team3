@@ -64,6 +64,8 @@ SAMPLE_MEMOS = (
     "보증금 1000 월세 38, 관리비는 물어보지 못함. 버스 정류장 5분. 반지하라 채광 약함. "
     "화장실 수압 약함. 옵션: 세탁기, 냉장고.",
 )
+# 매물 이름(#46부터 POST /sessions/{id}/listings의 name은 필수, 1~30자). SAMPLE_MEMOS와 같은 순서
+SAMPLE_LISTING_NAMES = ("스모크 1번 집", "스모크 2번 집")
 
 PASS, WARN, FAIL, SKIP = "PASS", "WARN", "FAIL", "SKIP"
 
@@ -366,10 +368,10 @@ class SmokeTest:
         return f"'{title}'"
 
     def step_create_listings(self) -> str:
-        for memo in SAMPLE_MEMOS:
+        for name, memo in zip(SAMPLE_LISTING_NAMES, SAMPLE_MEMOS):
             r = self._request(
                 "POST", f"/sessions/{self.session_id}/listings", token=self.user_token,
-                json_body={"memo_text": memo}, expect=(200, 201),
+                json_body={"name": name, "memo_text": memo}, expect=(200, 201),
             )
             body = self._json(r)
             if not isinstance(body, dict) or not body.get("id"):
