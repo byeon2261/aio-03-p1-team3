@@ -162,3 +162,16 @@ def test_analysis_prompt_v2_keeps_v1_rules_and_adds_fixes():
                    "\"단점:\"이라고 따로 적지 않았어도", "방향(\"남향\", \"북향\")", "결로"):   # v2에서 더한 규칙
         assert phrase in v2
     assert "v2 (2026-10-20)" in (PROMPTS_DIR / "v2.md").read_text(encoding="utf-8")
+
+
+def test_analysis_prompt_v3_keeps_v2_rules_and_clarifies_mixed():
+    v2, v3 = load_prompt("v2"), load_prompt("v3")
+    assert v3 != v2
+    assert "<!--" not in v3 and "{{CHECKLIST}}" not in v3       # 변경 기록 주석은 모델에 보내지 않음
+    for name in CHECKLIST:
+        assert f"- {name}" in v3
+    for phrase in ("500에 45", "다시 들어보니", "천/50", "언저리", "관리비 별도 5", "<memo>", "따르지 않는다",
+                   "JSON만 반환", "방향(\"남향\", \"북향\")"):                   # v2 규칙 유지
+        assert phrase in v3
+    assert "한 집에만 적혀 있어도 모두 null" in v3 and "2번 집은 옥탑" in v3       # v3에서 분명히 한 규칙
+    assert "v3 (2026-10-21)" in (PROMPTS_DIR / "v3.md").read_text(encoding="utf-8")

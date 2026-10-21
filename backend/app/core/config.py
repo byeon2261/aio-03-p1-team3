@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     GEMINI_THINKING_LEVEL: str = "minimal"
     GEMINI_TIMEOUT_SEC: int = 30
     GEMINI_MIN_INTERVAL_SEC: int = 4
-    ACTIVE_PROMPT_VERSION: str = "v2"
+    ACTIVE_PROMPT_VERSION: str = "v3"
 
     # 파일·임시 저장
     SIGNED_URL_TTL_SEC: int = 600

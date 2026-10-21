@@ -220,7 +220,7 @@ Render와 Streamlit은 GitHub 계정으로 로그인하면 저장소 연결이 �
 | `REDIS_URL` | Key Value 내부 URL | 자동(`fromService`) |
 | `PYTHON_VERSION` | `3.12.13` | 자동(Render는 패치 버전까지 요구) |
 | `GEMINI_MIN_INTERVAL_SEC` | `4` | 자동, 3-3에서 정한 값으로 바꿀 수 있음 |
-| `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`, `GEMINI_TIMEOUT_SEC`, `ACTIVE_PROMPT_VERSION`, `SIGNED_URL_TTL_SEC`, `MAX_PHOTO_MB`, `DRAFT_TTL_SEC`, `CACHE_TTL_SEC` | 코드 기본값(`gemini-3.5-flash-lite`, `minimal`, 30, `v2`, 600, 10, 86400, 604800) | 바꿀 때만 Environment에 추가. Environment에 `ACTIVE_PROMPT_VERSION`을 직접 넣어 두었다면 코드 기본값보다 그 값이 먼저 쓰인다 |
+| `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`, `GEMINI_TIMEOUT_SEC`, `ACTIVE_PROMPT_VERSION`, `SIGNED_URL_TTL_SEC`, `MAX_PHOTO_MB`, `DRAFT_TTL_SEC`, `CACHE_TTL_SEC` | 코드 기본값(`gemini-3.5-flash-lite`, `minimal`, 30, `v3`, 600, 10, 86400, 604800) | 바꿀 때만 Environment에 추가. Environment에 `ACTIVE_PROMPT_VERSION`을 직접 넣어 두었다면 코드 기본값보다 그 값이 먼저 쓰인다 |
 
 값이 빠지면 서버는 뜨지만 그 값을 쓰는 기능이 503 `CONFIG_MISSING`을 낸다.
 
