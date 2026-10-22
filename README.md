@@ -19,7 +19,7 @@
 | 데이터베이스 설계서 | [`docs/DB_DESIGN.md`](docs/DB_DESIGN.md) |
 | 개선 전후 기록 | [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md) |
 | 배포 환경 검증 기록 | [Issue #9](https://github.com/byeon2261/aio-03-p1-team3/issues/9) |
-| 발표 자료 | 10/22 추가 예정 (#11) |
+| 발표 자료 | [`docs/presentation/골라방_발표_v3최종.pdf`](docs/presentation/골라방_발표_v3최종.pdf) |
 
 무료 서버는 잠들어 있으면 첫 요청이 최대 1분 걸린다. 시연 전 깨우는 순서는 [`docs/DEPLOY.md`](docs/DEPLOY.md) 7절.
 
